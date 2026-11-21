@@ -244,21 +244,17 @@ def evaluate_run(persona: Persona, prep: InterviewPrep, result: RunResult, other
 
     One rerun, not a loop: if the same persona fails twice, the problem is
     probably the persona or the prompts, and a person should look.
-    """
-    critique = run_critique(persona, result, others, config, dry_run)
-    reran = critique.confidence == "low" and not spend.over_cap()
-    if reran:
-        result = run_once(persona, prep, config, result.interview.run, spend, dry_run, rerun=True)
-        critique = run_critique(persona, result, others, config, dry_run)
-    flagged = critique.confidence == "low"
 
-    summary_path = result.interview.transcript.path.parent / "summary.json"
-    summary = json.loads(summary_path.read_text()) | {"confidence": critique.confidence, "flagged": flagged}
-    summary_path.write_text(json.dumps(summary, indent=2))
-    interview = result.interview
-    return (f"{persona.id} run {interview.run}{' (rerun)' if reran else ''}: {len(interview.transcript.turns)} "
-            f"turns, stopped by {interview.stopped_by}, confidence {critique.confidence}"
-            f"{', FLAGGED for review' if flagged else ''}")
+    TODO (module 7): build the rerun rule.
+      1. Critique the run with run_critique().
+      2. If its confidence is "low" and spend isn't over the cap, run the same run
+         again with run_once(..., rerun=True) and critique the new result.
+      3. The run is flagged if the final critique is still "low".
+      4. Add "confidence" and "flagged" to the final attempt's summary.json.
+      5. Return a one-line message. The tests look for "(rerun)" after the run
+         number when a rerun happened, and "FLAGGED for review" when flagged.
+    """
+    raise NotImplementedError("Module 7: build evaluate_run()")
 
 
 def run_persona(persona: Persona, config: dict, spend: RunSpend, dry_run: bool = False) -> list[tuple[bool, str]]:

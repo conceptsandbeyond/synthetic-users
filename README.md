@@ -25,6 +25,10 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 | `config.yaml` | The advocate's allow-list, and `tools: advocate: [web_search]`. |
 | `tests/test_evaluation.py` | New tests for critiques, advocate isolation, tool access, the rerun rule, the interviewer check and resuming a paused search. |
 
+**Your task**
+
+You're on the `module-07-start` branch. The advocate prompt, schemas, interviewer check, search tool support and tests are in place. `evaluate_run()` in `harness/orchestrator.py` is empty: the rule that reruns a low-rated run once and flags a second low. Its docstring lists the steps. Build it until `pytest` passes, then compare with the `module-07-solution` branch.
+
 **Run it**
 
 ```bash
