@@ -276,9 +276,9 @@ interview:
   token_budget_per_interview: 40000
   runs_per_persona: 3
 isolation:
-  prep: [persona_summary]
+  prep: [persona_summary, question_bank]
   interviewer: [prep, transcript]
-  user: [persona, transcript]
+  user: [persona_profile, recent_task, transcript]
   debrief: [transcript]
   advocate: [persona, transcript, debrief]
   synthesis: [approved_debriefs, critiques]

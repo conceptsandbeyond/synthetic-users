@@ -6,9 +6,11 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 3: two agents talking
+## Module 4: context isolation
 
-**Goal.** Run a real interview. The interviewer asks, the synthetic user answers, and plain Python relays each turn between them. Every turn is written to disk the moment it happens.
+**Goal.** Make isolation a rule the code enforces instead of a habit. Every prompt is now assembled by `build_context()`, which refuses anything that isn't on that agent's allow-list in `config.yaml`. A test reads the real prompt log and proves the interviewer never saw the persona.
+
+This is the most important module. Spend the time here.
 
 Earlier modules' READMEs are on their `module-NN-solution` branches.
 
@@ -16,41 +18,33 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 
 | File | What changes |
 | --- | --- |
-| `harness/transcript.py` | New. `Transcript` appends each turn to `transcript.jsonl` as it happens and renders the conversation as text for the next prompt. |
-| `harness/orchestrator.py` | New `run_interview()`: the turn-taking loop. `main()` now preps and then interviews each persona. |
-| `harness/schemas.py` | New `Turn` (one transcript line) and `InterviewerTurn` (a question or `end`). `Persona` gains `recent_tasks`. |
-| `prompts/interviewer.md`, `prompts/user.md` | New system prompts for the two agents. |
-| `personas/*.json` | Three `recent_tasks` each. Run N talks about task N. |
-| `harness/stub_replies.json` | The dry-run replies, moved out of the code. The stub interviewer asks three questions and ends. |
-| `config.yaml` | `interview.max_interviewer_turns`, a safety cap. |
-| `tests/test_interview.py` | New tests for the loop and the transcript. |
+| `harness/context.py` | New. `build_context()` and the `ARTIFACTS` table that decides how each artifact is shown. |
+| `config.yaml` | New `isolation` allow-list for prep, interviewer and user. |
+| `harness/orchestrator.py` | `run_prep()` and `run_interview()` call `build_context()` instead of formatting prompts themselves. |
+| `tests/test_isolation.py` | New. Audits `calls.jsonl` for all 10 personas, and checks every way `build_context()` can refuse. |
 
 **Run it**
 
 ```bash
-pytest
-python -m harness.orchestrator --dry-run --personas p05
-python -m harness.orchestrator --personas p05
+pytest tests/test_isolation.py -v
+python -m harness.orchestrator --dry-run --personas p01
 ```
 
-**Exercise: read one interview aloud**
+**Exercise: leak the persona and watch what happens**
 
-Run one real interview, then read `runs/<persona_id>/run-1/transcript.jsonl` aloud in class, with one person as the interviewer and one as the interviewee. Then discuss:
-
-1. Where did the interviewer follow up on something the interviewee said, and where did it just move to the next prepared question?
-2. Did the interviewee ever push back, or name a reason the current method is good enough?
-3. Find one answer that sounds like a real person and one that sounds like a model. What's the difference?
+1. In `config.yaml`, add `persona_profile` to the interviewer's list. In `run_interview()`, pass `persona_profile=persona` to the interviewer's `build_context()` call.
+2. Run `pytest`. Ten isolation tests fail, one per persona. The harness caught the leak before a single token was spent.
+3. With an API key, run p01 leaked and then isolated. Put the two sets of questions side by side. Look for questions that assume the answer ("As someone who uses VoiceOver...") or that skip discovery and jump to what the interviewer already "knows".
+4. Undo the leak and make sure `pytest` is green again.
 
 **What good output looks like**
 
-- The interviewer opens with a question about one recent task and keeps returning to it.
-- Follow-ups use the interviewee's own words: "You said you checked it twice. What made you check again?"
-- The interviewee answers in a few spoken sentences, mentions what they do today, and doesn't fall in love with anything.
-- The run ends with "stopped by interviewer ended", usually after 10 to 16 questions. "Stopped by turn cap" means the interviewer prompt needs work.
+- Open `runs/p01-visually-impaired-diyer/run-1/calls.jsonl` and search for "Marcus". It appears only in calls where `"agent": "user"`.
+- Every prompt is a set of headed sections in allow-list order: "Interview prep:", then "Transcript:".
 
 **Things to notice**
 
-- Nobody talks to anybody. Each agent call is built fresh from what that agent may see, plus the transcript so far. The "conversation" exists only in `transcript.jsonl`.
-- The user agent never sees the job hypothesis. If it knew what was being tested, it would drift toward confirming it.
-- Repeat runs differ because each run talks about a different recent task, not because of randomness. Module 6 runs all three.
-- Both prompts are still built by hand inside `run_interview()`. Nothing stops a careless edit from showing the interviewer the persona. That's the problem module 4 solves.
+- The artifact's name decides what leaves. `persona_summary` renders only the summary, even when you pass it the whole persona, so a careless caller can't leak by accident.
+- A missing artifact is an error too. A prompt that quietly goes out without the transcript is a bug that's hard to spot in the output.
+- The test reads the log, not the code. It checks what the model actually received.
+- One honest limit: the interviewer does learn about the persona through the interviewee's answers. That's the point of an interview. Isolation stops the interviewer from knowing things nobody told it.

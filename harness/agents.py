@@ -104,8 +104,8 @@ def _real_client() -> anthropic.Anthropic:
 def _log_call(log_dir: Path, agent: str, response, latency: float, system: str, messages: list, output: str) -> None:
     """Append one line to calls.jsonl with everything needed to replay the call.
 
-    The exact prompt is logged on purpose. In module 4 this log becomes the
-    isolation audit: search it to prove the interviewer never saw the persona.
+    The exact prompt is logged on purpose. The log doubles as the isolation
+    audit: tests/test_isolation.py reads it to prove what each agent saw.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
     record = {

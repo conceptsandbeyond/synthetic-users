@@ -17,6 +17,7 @@ import yaml
 from dotenv import load_dotenv
 
 from harness.agents import AgentError, OutputInvalid, call_agent, call_agent_json
+from harness.context import build_context
 from harness.schemas import InterviewerTurn, InterviewPrep, Persona, describe_error
 from harness.transcript import Transcript
 
@@ -61,11 +62,10 @@ def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> Interview
     If the reply fails validation twice, save both replies and the error to
     failed.json so you can see exactly what went wrong, then re-raise.
     """
-    # Built by hand for now. Module 4 moves prompt assembly into build_context(),
-    # which enforces what each agent is allowed to see.
-    user_message = (
-        f"{persona.summary()}\n\n"
-        f"Interview guide for this segment:\n\n{question_bank(persona.segment, config['paths']['question_bank'])}"
+    user_message = build_context(
+        "prep", config,
+        persona_summary=persona,
+        question_bank=question_bank(persona.segment, config["paths"]["question_bank"]),
     )
     out_dir = config["paths"]["runs"] / persona.id / "prep"
     try:
@@ -87,23 +87,19 @@ def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int 
     """Run one interview and return the transcript and the reason it stopped.
 
     The code relays every turn. The two agents never talk to each other
-    directly: each call is built fresh from what that agent is allowed to see.
+    directly: each call is built fresh by build_context() from what that
+    agent is allowed to see.
     """
     run_dir = config["paths"]["runs"] / persona.id / f"run-{run}"
     transcript = Transcript(run_dir / "transcript.jsonl")
     # Each run talks about a different recent task. That's what makes repeat runs differ.
     task = persona.recent_tasks[(run - 1) % len(persona.recent_tasks)]
-    prep_text = prep.model_dump_json(indent=2, exclude={"persona_id"})
-    # The user never sees the job hypothesis: knowing what's being tested invites it to confirm it.
-    profile = persona.model_dump_json(indent=2, exclude={"id", "job_hypothesis", "recent_tasks"})
 
     # A safety cap so one interviewer that never says "end" can't run up a bill.
     # Module 5 adds the other stop rules.
     for _ in range(config["interview"]["max_interviewer_turns"]):
-        # Both prompts are built by hand for now. Module 4 moves this into build_context().
         move = call_agent_json(
-            "interviewer",
-            f"Interview prep:\n{prep_text}\n\nTranscript so far:\n{transcript.render()}",
+            "interviewer", build_context("interviewer", config, prep=prep, transcript=transcript),
             InterviewerTurn, config, run_dir, dry_run,
         )
         if move.action == "end":
@@ -112,8 +108,7 @@ def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int 
 
         answer = call_agent(
             "user",
-            f"Your profile:\n{profile}\n\nThe recent task this interview is about:\n{task}\n\n"
-            f"Transcript so far:\n{transcript.render()}",
+            build_context("user", config, persona_profile=persona, recent_task=task, transcript=transcript),
             config, run_dir, dry_run,
         )
         transcript.add("user", answer)

@@ -1,5 +1,5 @@
 # Harness configuration. Model names live here and nowhere else.
-# Later modules add budgets and the isolation allow-list.
+# Later modules add budgets.
 
 models:
   prep: claude-sonnet-5-5
@@ -16,6 +16,13 @@ max_tokens: 16000
 interview:
   # Safety cap. The interviewer normally ends the interview itself.
   max_interviewer_turns: 20
+
+# What each agent may see. build_context() refuses anything else.
+# Later modules add the debrief, advocate and synthesis agents.
+isolation:
+  prep: [persona_summary, question_bank]
+  interviewer: [prep, transcript]
+  user: [persona_profile, recent_task, transcript]
 
 # Relative to the repo root.
 paths:
