@@ -65,7 +65,7 @@ Six agent roles, each a system prompt plus a typed output. The persona is an inp
 | Interviewer agent | Prep JSON, transcript so far | Next question, or an end signal | claude-sonnet-5-5 | None |
 | Synthetic user agent | Persona profile without the job hypothesis, this run's recent task, transcript so far | One in-character answer | claude-haiku-5-5 | None |
 | Debrief agent | Transcript only | Debrief JSON: name, occupation, goals, pressing needs, insights, opportunities, with quotes | claude-sonnet-5-5 | User Debrief |
-| Devil's advocate | Persona, transcript, debrief | Critique JSON: check results, unsupported claims, confidence rating | claude-opus-5-5 | None |
+| Devil's advocate | Persona, transcript, debrief, the persona's other debriefs | Critique JSON: check results, unsupported claims, confidence rating | claude-opus-5-5 | None |
 | Synthesis agent | All approved debriefs | Cross-segment report: shared jobs, strongest segment, claims to verify | claude-opus-5-5 | None |
 
 The orchestrator is code, not an agent. It runs the loop, enforces isolation and writes files. Keeping it deterministic is a teaching point: only the parts that need judgment get a model.
@@ -282,7 +282,7 @@ isolation:
   interviewer: [prep, transcript]
   user: [persona_profile, recent_task, transcript]
   debrief: [transcript]
-  advocate: [persona, transcript, debrief]
+  advocate: [persona, transcript, debrief, other_debriefs]
   synthesis: [approved_debriefs, critiques]
 ```
 

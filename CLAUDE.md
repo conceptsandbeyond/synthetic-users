@@ -24,7 +24,7 @@ Full spec: `docs/design-spec.md`. Personas: `docs/personas.md`. Interview questi
 | interviewer | prep JSON, transcript so far | next question, or `{"action": "end"}` | none |
 | user (synthetic) | persona without the job hypothesis, this run's recent task, transcript so far | one in-character answer | none |
 | debrief | transcript only | User Debrief JSON with `evidence_turns` | User Debrief |
-| advocate (devil's advocate) | persona, transcript, debrief | critique JSON with confidence rating | none |
+| advocate (devil's advocate) | persona, transcript, debrief, the same persona's other debriefs | critique JSON with confidence rating | none |
 | synthesis | approved debriefs, critiques | cross-segment report | none |
 
 ## Context isolation: the most important rule
@@ -61,11 +61,13 @@ harness/
   orchestrator.py  run_persona() and the main loop
   schemas.py       Pydantic models
   transcript.py    append-only JSONL writer
+  checks.py        interviewer check: flags leading and future questions
   stub_replies.json canned replies for --dry-run
   review.py        human review CLI
   render.py        renders prep and debrief JSON to Markdown laid out like the templates
 runs/              outputs: runs/<persona_id>/<run>/
-tests/             test_isolation.py, test_schemas.py, test_interview.py, test_stop_rules.py
+tests/             test_isolation.py, test_schemas.py, test_interview.py, test_stop_rules.py,
+                   test_pipeline.py, test_evaluation.py
 module9_agent_sdk/ the Agent SDK rebuild
 ```
 

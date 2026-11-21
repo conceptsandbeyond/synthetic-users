@@ -92,6 +92,12 @@ def call_agent_json(
     raise OutputInvalid(agent, last_error, replies)
 
 
+# Server tools an agent may use. config.yaml decides which agent gets which,
+# and only the devil's advocate gets one. Anthropic runs these tools, not us.
+TOOLS = {"web_search": {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}}
+MAX_CONTINUATIONS = 3
+
+
 def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_run: bool = False,
                meter: TokenMeter | None = None) -> str:
     """Send one request to the model configured for `agent` and return its text.
@@ -103,25 +109,49 @@ def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_r
     model = config["models"][agent]
     system = (Path(config["paths"]["prompts"]) / f"{agent}.md").read_text()
     messages = [{"role": "user", "content": user_message}]
+    tools = [TOOLS[name] for name in config.get("tools", {}).get(agent, [])]
+    request = {"model": model, "max_tokens": config["max_tokens"], "system": system}
+    if tools:
+        request["tools"] = tools
     client = StubClient(agent) if dry_run else _real_client()
 
     start = time.monotonic()
-    response = client.messages.create(
-        model=model, max_tokens=config["max_tokens"], system=system, messages=messages
-    )
+    response = client.messages.create(messages=messages, **request)
+    calls, assistant_so_far = [response], []
+    # A long run of searches can pause. Sending back what came so far resumes it.
+    while response.stop_reason == "pause_turn" and len(calls) <= MAX_CONTINUATIONS:
+        assistant_so_far += response.content
+        response = client.messages.create(
+            messages=messages + [{"role": "assistant", "content": assistant_so_far}], **request)
+        calls.append(response)
     latency = time.monotonic() - start
 
-    text = "".join(block.text for block in response.content if block.type == "text")
-    _log_call(log_dir, agent, response, latency, system, messages, text)
+    text = _final_text(response.content)
+    usage = SimpleNamespace(input_tokens=sum(c.usage.input_tokens for c in calls),
+                            output_tokens=sum(c.usage.output_tokens for c in calls))
+    _log_call(log_dir, agent, response.model, usage, latency, response.stop_reason, system, messages, text,
+              [t["name"] for t in tools])
     if meter:
-        meter.add(response.usage)
+        meter.add(usage)
 
     # Log first, then fail: a failed call is exactly the one you'll want to read.
     if response.stop_reason == "refusal":
         raise AgentError(f"{agent}: the model declined this request. See {log_dir}/calls.jsonl")
     if response.stop_reason == "max_tokens":
         raise AgentError(f"{agent}: reply was cut off at max_tokens. Raise max_tokens in config.yaml")
+    if response.stop_reason == "pause_turn":
+        raise AgentError(f"{agent}: still searching after {MAX_CONTINUATIONS} continuations")
     return text
+
+
+def _final_text(content: list) -> str:
+    """Return the reply's text after its last tool result.
+
+    With web search, a model may write notes between searches. Only the text
+    after the last search is its answer.
+    """
+    last_result = max((i for i, b in enumerate(content) if b.type.endswith("_tool_result")), default=-1)
+    return "".join(b.text for b in content[last_result + 1:] if b.type == "text")
 
 
 @cache
@@ -130,7 +160,8 @@ def _real_client() -> anthropic.Anthropic:
     return anthropic.Anthropic()
 
 
-def _log_call(log_dir: Path, agent: str, response, latency: float, system: str, messages: list, output: str) -> None:
+def _log_call(log_dir: Path, agent: str, model: str, usage, latency: float, stop_reason: str,
+              system: str, messages: list, output: str, tools: list[str]) -> None:
     """Append one line to calls.jsonl with everything needed to replay the call.
 
     The exact prompt is logged on purpose. The log doubles as the isolation
@@ -140,11 +171,12 @@ def _log_call(log_dir: Path, agent: str, response, latency: float, system: str, 
     record = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "agent": agent,
-        "model": response.model,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
+        "model": model,
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
         "latency_s": round(latency, 2),
-        "stop_reason": response.stop_reason,
+        "stop_reason": stop_reason,
+        "tools": tools,
         "system": system,
         "messages": messages,
         "output": output,
@@ -175,7 +207,7 @@ class _StubMessages:
     def __init__(self, agent: str):
         self.agent = agent
 
-    def create(self, *, model: str, max_tokens: int, system: str, messages: list):
+    def create(self, *, model: str, max_tokens: int, system: str, messages: list, tools: list | None = None):
         """Return a canned reply in the same shape as a real Message."""
         text = _pick_stub_reply(self.agent, messages[-1]["content"])
         prompt_chars = len(system) + sum(len(m["content"]) for m in messages)

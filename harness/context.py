@@ -24,6 +24,12 @@ ARTIFACTS = {
     ),
     "recent_task": ("The recent task this interview is about", str),
     "transcript": ("Transcript", lambda transcript: transcript.render()),
+    "persona": ("Persona given to the synthetic user", lambda persona: persona.model_dump_json(indent=2)),
+    "debrief": ("Debrief of this run", lambda debrief: debrief.model_dump_json(indent=2)),
+    "other_debriefs": (
+        "Debriefs of this persona's other runs",
+        lambda debriefs: "\n\n".join(d.model_dump_json(indent=2) for d in debriefs) or "(none)",
+    ),
 }
 
 

@@ -123,6 +123,38 @@ class UserDebrief(BaseModel):
     opportunities: list[str]
 
 
+Rating = Literal["pass", "warn", "fail"]
+
+
+class Checks(BaseModel):
+    """The devil's advocate's seven checks. See prompts/advocate.md for what each means."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_trail: Rating
+    too_agreeable: Rating
+    missing_alternatives: Rating
+    stereotype: Rating
+    consistency: Rating
+    reality_anchor: Rating
+    job_strength: Rating
+
+
+class Critique(BaseModel):
+    """The devil's advocate's verdict on one run. A low confidence triggers a rerun."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    persona_id: str
+    run: int
+    checks: Checks
+    summary: str
+    unsupported_claims: list[str]
+    verify_in_real_interviews: list[str]
+    sources: list[str]  # pages the reality-anchor check relied on
+    confidence: Literal["low", "medium", "high"]
+
+
 def check_evidence(debrief: UserDebrief, turns: list[Turn]) -> None:
     """Raise ValueError unless every cited turn is an answer in this transcript.
 

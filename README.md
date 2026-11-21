@@ -6,9 +6,9 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 6: pipelines and repeat runs
+## Module 7: evaluation
 
-**Goal.** Turn one interview into a pipeline. Each persona is prepped once, then interviewed and debriefed three times, each run about a different recent task. Personas run in parallel. Every prep and debrief is also rendered as Markdown laid out like the Concepts and Beyond templates.
+**Goal.** Catch weak results before a person reads them. Each run now gets two checks. The devil's advocate agent assumes the debrief is wrong until the evidence proves otherwise, and it's the only agent with a tool: web search for the reality-anchor check. The interviewer check is plain code that flags leading questions and questions about the future. A run the advocate rates `low` is rerun once. A second `low` is flagged for human review.
 
 Earlier modules' READMEs are on their `module-NN-solution` branches.
 
@@ -16,41 +16,41 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 
 | File | What changes |
 | --- | --- |
-| `prompts/debrief.md` | New. The debrief agent works from the transcript alone and must cite turns. |
-| `harness/schemas.py` | New `UserDebrief`, plus `check_evidence()`: every cited turn must be an interviewee answer in this transcript. |
-| `harness/agents.py` | `call_agent_json()` takes an optional `check`, an extra test that gets the same single retry as a schema error. |
-| `harness/orchestrator.py` | New `run_debrief()`, `run_persona()` and `RunSpend`. `main()` runs personas in a thread pool. Each step starts in an emptied folder, and `save_failure()` writes `failed-<agent>.json`. |
-| `harness/render.py` | New. Renders `prep.md` and `debrief.md` with the banner, quoting each cited turn. |
-| `config.yaml` | `runs_per_persona`, `parallel_personas`, and the debrief's allow-list (`transcript` only). |
-| `tests/test_pipeline.py` | New tests for the three runs, rendering, debrief isolation, evidence checks and the parallel run. |
+| `prompts/advocate.md` | New. Seven checks, each rated pass, warn or fail, plus a confidence rule. |
+| `harness/schemas.py` | New `Checks` and `Critique`. |
+| `harness/checks.py` | New. `check_questions()`, the interviewer check, built from regular expressions. |
+| `harness/agents.py` | `call_agent()` attaches server tools from config, resumes a paused search, keeps only the text after the last search result, and logs each call's tools. |
+| `harness/context.py` | New artifacts for the advocate: the full `persona`, this run's `debrief`, and `other_debriefs`. |
+| `harness/orchestrator.py` | New `run_once()`, `run_critique()` and `evaluate_run()`. Critiques wait until all runs are done. A low rating reruns into `run-N-rerun/`. `summary.json` records the confidence and whether the run is flagged. |
+| `config.yaml` | The advocate's allow-list, and `tools: advocate: [web_search]`. |
+| `tests/test_evaluation.py` | New tests for critiques, advocate isolation, tool access, the rerun rule, the interviewer check and resuming a paused search. |
 
 **Run it**
 
 ```bash
-pytest
-python -m harness.orchestrator --dry-run
-python -m harness.orchestrator --personas p03
+pytest tests/test_evaluation.py -v
+python -m harness.orchestrator --dry-run --personas p10
+python -m harness.orchestrator --personas p10
 ```
 
-Outputs land in `runs/<persona_id>/prep/` and `runs/<persona_id>/run-1/` to `run-3/`. Each run folder holds `transcript.jsonl`, `debrief.json`, `debrief.md`, `summary.json` and `calls.jsonl`.
+**Exercise: find a run the critic rates low**
 
-**Exercise: compare three debriefs of the same persona**
+Run all ten personas for real, then find every `summary.json` with `"confidence": "low"`.
 
-Run one persona for real, then open its three `debrief.md` files side by side.
-
-1. Which needs show up in all three runs? Those are your strongest signals.
-2. Which needs show up in only one? Is that because the recent task was different, or because the synthetic user said something new?
-3. Pick one insight and read the quoted turn. Does the quote actually support it, or did the debrief agent stretch it?
+1. Read that run's `critique.json`. Which checks failed, and do you agree after reading the transcript?
+2. Look at the rerun in `run-N-rerun/`. Did it fix the problem? If not, is the problem the persona, the user prompt or the interviewer prompt? Try a prompt fix before a code fix.
+3. Open `interviewer_check.json` for a few runs. Find one flag you agree with and one false alarm. What would it take to catch the subtle leading questions the patterns miss?
 
 **What good output looks like**
 
-- Every need and insight in `debrief.md` has at least one quote under it, from an interviewee answer.
-- The three debriefs overlap but aren't identical. Identical debriefs mean the recent tasks aren't doing their job. Completely different ones mean the persona isn't holding together.
-- The run summary ends with "30 of 30 runs completed" for a full run.
+- Each run folder has `critique.json` and `interviewer_check.json`, and its `summary.json` has `confidence` and `flagged`.
+- Most runs come back `medium`. A wall of `high` ratings is suspicious: a devil's advocate that agrees with everything isn't doing its job.
+- The `sources` in a critique are real pages about real people doing this job: forums, research or advocacy organizations.
 
 **Things to notice**
 
-- The debrief agent never sees the persona. If a debrief says something the transcript doesn't, the evidence check or the reader will catch it.
-- The name comes from code, not from the model. The debrief agent never learns it.
-- Evidence is checked in two layers. Pydantic checks the shape. `check_evidence()` checks the meaning: the cited turn has to exist and has to be an answer.
-- Personas run in parallel, but one persona's runs stay in order, so its logs read top to bottom.
+- The advocate is the only agent that sees everything: persona, transcript, debrief and the other runs. Its job is to find gaps between them.
+- It runs on a stronger model than the agents it checks, but it shares their blind spots. For p01 and p10, plan a review by two or three people from those communities before treating either persona as credible.
+- One tool, for one check. Search adds cost, latency and outside text in the prompt. It's worth that only where the answer has to come from outside the harness.
+- The interviewer check is code, not a model, so you can predict exactly what it flags. It also guarantees false alarms: "Would you rather..." is a fair contrasting question that still gets flagged as about the future.
+- One rerun, then a person. A persona that fails twice needs a human, not a third try.

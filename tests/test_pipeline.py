@@ -93,8 +93,8 @@ def test_bad_evidence_gets_the_retry(config, monkeypatch):
 def test_run_token_cap_skips_the_remaining_runs(config):
     spend = RunSpend(cap=1)  # the first interview spends more than this
     results = run_persona(PERSONA, config, spend, dry_run=True)
-    assert [ok for ok, _ in results] == [True, False, False]
-    assert "SKIPPED" in results[1][1]
+    assert sorted(ok for ok, _ in results) == [False, False, True]
+    assert sum("SKIPPED" in message for _, message in results) == 2
 
 
 def test_main_runs_personas_in_parallel(config, monkeypatch, capsys):

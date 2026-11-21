@@ -82,5 +82,24 @@
       "Confidence at the moment of fixing, not after",
       "The current approach may be good enough for small jobs"
     ]
+  },
+  "advocate": {
+    "checks": {
+      "evidence_trail": "pass",
+      "too_agreeable": "pass",
+      "missing_alternatives": "pass",
+      "stereotype": "pass",
+      "consistency": "pass",
+      "reality_anchor": "warn",
+      "job_strength": "warn"
+    },
+    "summary": "The debrief matches the transcript, and the interviewee named a cost and a workaround. The pain is mild: a redo costs half an hour, so the job may not be strong enough to change behavior.",
+    "unsupported_claims": [],
+    "verify_in_real_interviews": [
+      "How often does a redo actually happen?",
+      "Would they stop asking for a second check if a tool told them it was level?"
+    ],
+    "sources": [],
+    "confidence": "medium"
   }
 }

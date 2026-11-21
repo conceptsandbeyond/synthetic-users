@@ -1,4 +1,4 @@
-"""The orchestrator: prep, interview and debrief every persona.
+"""The orchestrator: prep, interview, debrief and critique every persona.
 
 This file grows into the full pipeline over the modules. It is plain Python
 on purpose. The code decides who speaks next, what each agent sees and when
@@ -21,10 +21,11 @@ import yaml
 from dotenv import load_dotenv
 
 from harness.agents import AgentError, OutputInvalid, TokenMeter, call_agent, call_agent_json
+from harness.checks import check_questions
 from harness.context import build_context
 from harness.render import render_debrief, render_prep
-from harness.schemas import (InterviewerTurn, InterviewPrep, Persona, UserDebrief, check_evidence,
-                             describe_error)
+from harness.schemas import (Critique, InterviewerTurn, InterviewPrep, Persona, UserDebrief,
+                             check_evidence, describe_error)
 from harness.transcript import Transcript
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -127,14 +128,14 @@ def stop_rule_hit(transcript: Transcript, tokens_used: int, config: dict) -> str
 
 
 def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int = 1,
-                  dry_run: bool = False) -> Interview:
+                  dry_run: bool = False, rerun: bool = False) -> Interview:
     """Run one interview until the interviewer ends it or a stop rule fires.
 
     The code relays every turn. The two agents never talk to each other
     directly: each call is built fresh by build_context() from what that
     agent is allowed to see.
     """
-    run_dir = fresh_dir(config["paths"]["runs"] / persona.id / f"run-{run}")
+    run_dir = fresh_dir(config["paths"]["runs"] / persona.id / f"run-{run}{'-rerun' if rerun else ''}")
     transcript = Transcript(run_dir / "transcript.jsonl")
     meter = TokenMeter()
     # Each run talks about a different recent task. That's what makes repeat runs differ.
@@ -200,37 +201,98 @@ class RunSpend:
         return self.spent >= self.cap
 
 
-def run_persona(persona: Persona, config: dict, spend: RunSpend, dry_run: bool = False) -> list[tuple[bool, str]]:
-    """Prep once, then interview and debrief the persona runs_per_persona times.
+@dataclass
+class RunResult:
+    """One interview and its debrief."""
 
-    Returns (succeeded, message) for each run. A failed run is reported and
-    the next run still goes ahead.
+    interview: Interview
+    debrief: UserDebrief
+
+
+def run_once(persona: Persona, prep: InterviewPrep, config: dict, run: int, spend: RunSpend,
+             dry_run: bool = False, rerun: bool = False) -> RunResult:
+    """Interview and debrief once."""
+    interview = run_interview(persona, prep, config, run, dry_run, rerun)
+    spend.add(interview.tokens)
+    return RunResult(interview, run_debrief(persona, interview, config, dry_run))
+
+
+def run_critique(persona: Persona, result: RunResult, others: list[UserDebrief], config: dict,
+                 dry_run: bool = False) -> Critique:
+    """Run the interviewer check and the devil's advocate on one run, and save both."""
+    run_dir = result.interview.transcript.path.parent
+    flagged_questions = check_questions(result.interview.transcript.turns)
+    (run_dir / "interviewer_check.json").write_text(json.dumps(flagged_questions, indent=2))
+    try:
+        critique = call_agent_json(
+            "advocate",
+            build_context("advocate", config, persona=persona, transcript=result.interview.transcript,
+                          debrief=result.debrief, other_debriefs=others),
+            Critique, config, run_dir, dry_run,
+            known_fields={"persona_id": persona.id, "run": result.interview.run},
+        )
+    except OutputInvalid as failure:
+        save_failure(run_dir, failure)
+        raise
+    (run_dir / "critique.json").write_text(critique.model_dump_json(indent=2))
+    return critique
+
+
+def evaluate_run(persona: Persona, prep: InterviewPrep, result: RunResult, others: list[UserDebrief],
+                 config: dict, spend: RunSpend, dry_run: bool = False) -> str:
+    """Critique one run. A low rating gets one rerun; a second low is flagged for human review.
+
+    One rerun, not a loop: if the same persona fails twice, the problem is
+    probably the persona or the prompts, and a person should look.
+    """
+    critique = run_critique(persona, result, others, config, dry_run)
+    reran = critique.confidence == "low" and not spend.over_cap()
+    if reran:
+        result = run_once(persona, prep, config, result.interview.run, spend, dry_run, rerun=True)
+        critique = run_critique(persona, result, others, config, dry_run)
+    flagged = critique.confidence == "low"
+
+    summary_path = result.interview.transcript.path.parent / "summary.json"
+    summary = json.loads(summary_path.read_text()) | {"confidence": critique.confidence, "flagged": flagged}
+    summary_path.write_text(json.dumps(summary, indent=2))
+    interview = result.interview
+    return (f"{persona.id} run {interview.run}{' (rerun)' if reran else ''}: {len(interview.transcript.turns)} "
+            f"turns, stopped by {interview.stopped_by}, confidence {critique.confidence}"
+            f"{', FLAGGED for review' if flagged else ''}")
+
+
+def run_persona(persona: Persona, config: dict, spend: RunSpend, dry_run: bool = False) -> list[tuple[bool, str]]:
+    """Prep once, interview and debrief each run, then critique every run.
+
+    Returns (succeeded, message) for each run. Critiques wait until all runs
+    are done, so the consistency check can compare each run with the others.
     """
     try:
         prep = run_prep(persona, config, dry_run)
     except AgentError as error:
         return [(False, f"{persona.id} prep: FAILED. {error}")]
 
-    results = []
+    messages, results = [], {}
     for run in range(1, config["runs_per_persona"] + 1):
-        label = f"{persona.id} run {run}"
         if spend.over_cap():
-            results.append((False, f"{label}: SKIPPED. The run has spent {spend.spent:,} tokens."))
+            messages.append((False, f"{persona.id} run {run}: SKIPPED. The run has spent {spend.spent:,} tokens."))
             continue
         try:
-            interview = run_interview(persona, prep, config, run, dry_run)
-            spend.add(interview.tokens)
-            run_debrief(persona, interview, config, dry_run)
+            results[run] = run_once(persona, prep, config, run, spend, dry_run)
         except AgentError as error:
-            results.append((False, f"{label}: FAILED. {error}"))
-            continue
-        results.append((True, f"{label}: {len(interview.transcript.turns)} turns, stopped by "
-                              f"{interview.stopped_by}, {interview.tokens:,} tokens, debriefed"))
-    return results
+            messages.append((False, f"{persona.id} run {run}: FAILED. {error}"))
+
+    for run, result in results.items():
+        others = [r.debrief for n, r in results.items() if n != run]
+        try:
+            messages.append((True, evaluate_run(persona, prep, result, others, config, spend, dry_run)))
+        except AgentError as error:
+            messages.append((False, f"{persona.id} run {run} critique: FAILED. {error}"))
+    return messages
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prep, interview and debrief each persona.")
+    parser = argparse.ArgumentParser(description="Prep, interview, debrief and critique each persona.")
     parser.add_argument("--dry-run", action="store_true", help="use the stub model: no API key, no cost")
     parser.add_argument("--personas", help="comma-separated id prefixes, e.g. p01,p05")
     args = parser.parse_args()
