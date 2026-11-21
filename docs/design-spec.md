@@ -63,7 +63,7 @@ Six agent roles, each a system prompt plus a typed output. The persona is an inp
 | --- | --- | --- | --- | --- |
 | Prep agent | Persona summary (segment, job hypothesis), JTBD question bank | Prep JSON: key hypotheses, who to interview, starter questions | claude-sonnet-5-5 | Interview Prep |
 | Interviewer agent | Prep JSON, transcript so far | Next question, or an end signal | claude-sonnet-5-5 | None |
-| Synthetic user agent | Full persona profile, transcript so far | One in-character answer | claude-haiku-5-5 | None |
+| Synthetic user agent | Persona profile without the job hypothesis, this run's recent task, transcript so far | One in-character answer | claude-haiku-5-5 | None |
 | Debrief agent | Transcript only | Debrief JSON: name, occupation, goals, pressing needs, insights, opportunities, with quotes | claude-sonnet-5-5 | User Debrief |
 | Devil's advocate | Persona, transcript, debrief | Critique JSON: check results, unsupported claims, confidence rating | claude-opus-5-5 | None |
 | Synthesis agent | All approved debriefs | Cross-segment report: shared jobs, strongest segment, claims to verify | claude-opus-5-5 | None |
@@ -88,7 +88,7 @@ Isolation is the most important rule in the harness. Each agent call is built fr
 **Why each rule exists**
 
 - The interviewer never sees the persona, so it has to discover answers by probing instead of steering toward what it already knows.
-- The synthetic user never sees the prep, so it can't tailor answers to the hypotheses being tested.
+- The synthetic user never sees the prep or the persona's job hypothesis, so it can't tailor answers to the hypotheses being tested.
 - The debrief agent never sees the persona, so it reports what was said, not what the profile claims.
 - The devil's advocate sees everything, because its job is to find gaps between the persona, the interview and the debrief.
 
@@ -111,7 +111,8 @@ Every agent output is JSON validated against a Pydantic model. An output that fa
   "behaviors": ["Uses a beeping phone app", "Asks a neighbor to check his work"],
   "values": ["Independence"],
   "current_alternatives": ["Phone level app", "Sighted neighbor"],
-  "objections": ["Free app is good enough most of the time"]
+  "objections": ["Free app is good enough most of the time"],
+  "recent_tasks": ["Mounted floating shelves in his home office about two weeks ago", "...", "..."]
 }
 ```
 
@@ -175,9 +176,9 @@ The orchestrator is a plain Python loop. It relays messages between the intervie
 3. The run hits its token budget (default 40,000 tokens per interview).
 4. The synthetic user returns 3 answers in a row under 10 words, which signals a stalled interview.
 
-**Repeat runs:** each persona runs 3 times with temperature 0.9 for the synthetic user and 0.3 for the interviewer. The devil's advocate compares runs for the consistency check.
+**Repeat runs:** each persona runs 3 times. Each run gives the synthetic user a different task from the persona's `recent_tasks`, so the interviewer's "tell me about the last time" lands on a different real situation, the way it would with different real people. Temperature isn't used: current Claude models accept only the default. The devil's advocate compares runs for the consistency check.
 
-**Rerun loop:** a critique with `confidence: low` triggers one automatic rerun of that interview with a fresh seed. A second low rating goes to human review flagged, with no further reruns.
+**Rerun loop:** a critique with `confidence: low` triggers one automatic rerun of that interview. A second low rating goes to human review flagged, with no further reruns.
 
 ```python
 def run_persona(persona, config):
@@ -274,7 +275,6 @@ interview:
   max_interviewer_turns: 20
   token_budget_per_interview: 40000
   runs_per_persona: 3
-  temperature: {interviewer: 0.3, user: 0.9}
 isolation:
   prep: [persona_summary]
   interviewer: [prep, transcript]

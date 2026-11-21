@@ -7,8 +7,9 @@ steps later when another agent quietly works from a broken input.
 
 import json
 import re
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 
 class Persona(BaseModel):
@@ -16,7 +17,9 @@ class Persona(BaseModel):
 
     These are hypotheses, not research. current_alternatives and objections
     exist so the synthetic user has something concrete to push back with
-    instead of agreeing with every question.
+    instead of agreeing with every question. recent_tasks gives each repeat
+    run a different real situation to talk about, which is what makes runs
+    differ from each other.
     """
 
     # Reject unknown keys so a typo in a hand-written file fails loudly.
@@ -32,6 +35,7 @@ class Persona(BaseModel):
     values: list[str] = Field(min_length=1)
     current_alternatives: list[str] = Field(min_length=1)
     objections: list[str] = Field(min_length=1)
+    recent_tasks: list[str] = Field(min_length=3)
 
     def summary(self) -> str:
         """Return the only persona facts the prep agent may see.
@@ -57,6 +61,34 @@ class InterviewPrep(BaseModel):
     interviewee_profile: str
     starter_questions: list[str] = Field(min_length=5, max_length=7)
     contrasting_questions: list[str] = Field(min_length=4, max_length=6)
+
+
+class Turn(BaseModel):
+    """One line of transcript.jsonl.
+
+    Turns are numbered across both speakers (1, 2, 3...) so later agents can
+    cite exact turns as evidence.
+    """
+
+    turn: int
+    speaker: Literal["interviewer", "user"]
+    text: str
+    ts: str
+
+
+class InterviewerTurn(BaseModel):
+    """The interviewer's output: the next question, or a signal to stop."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["ask", "end"]
+    question: str | None = None
+
+    @model_validator(mode="after")
+    def ask_needs_a_question(self) -> "InterviewerTurn":
+        if self.action == "ask" and not (self.question and self.question.strip()):
+            raise ValueError('action "ask" needs a non-empty "question"')
+        return self
 
 
 def parse_reply(text: str, schema: type[BaseModel], known_fields: dict | None = None) -> BaseModel:

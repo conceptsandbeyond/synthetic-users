@@ -128,31 +128,11 @@ def _log_call(log_dir: Path, agent: str, response, latency: float, system: str, 
 # The stub copies the shape of anthropic.Anthropic() just closely enough that
 # call_agent() can't tell the difference. No network, no API key, no cost.
 
-CANNED_REPLIES = {
-    "prep": json.dumps(
-        {
-            "key_hypotheses": [
-                "The job hypothesis describes a real, recent struggle, not a general wish",
-                "The current workaround costs time, accuracy or independence",
-                "The current workaround is good enough and nothing would change",
-            ],
-            "interviewee_profile": "Someone in this segment who has done a leveling task in the last month. Screen out anyone who has never done one.",
-            "starter_questions": [
-                "Tell me about the last time you had to get something level.",
-                "What made that the day you did it?",
-                "Who else was around while you worked?",
-                "How did you know it was straight?",
-                "When did you find out whether it really was level?",
-            ],
-            "contrasting_questions": [
-                "Was the bigger problem the time it took or the result?",
-                "Why that method rather than asking someone for help?",
-                "What's worse about your current method than the one before it?",
-                "Would you rather it be faster or more accurate?",
-            ],
-        }
-    ),
-}
+STUB_REPLIES = json.loads((Path(__file__).parent / "stub_replies.json").read_text())
+
+# How the stub tells how far an interview has got: it counts this speaker's
+# earlier turns in the rendered transcript (see Transcript.render()).
+STUB_TURN_MARKERS = {"interviewer": "] Interviewer: ", "user": "] Interviewee: "}
 
 
 class StubClient:
@@ -168,7 +148,7 @@ class _StubMessages:
 
     def create(self, *, model: str, max_tokens: int, system: str, messages: list):
         """Return a canned reply in the same shape as a real Message."""
-        text = CANNED_REPLIES[self.agent]
+        text = _pick_stub_reply(self.agent, messages[-1]["content"])
         prompt_chars = len(system) + sum(len(m["content"]) for m in messages)
         return SimpleNamespace(
             model=f"stub:{model}",
@@ -177,3 +157,16 @@ class _StubMessages:
             # Rough estimate (about 4 characters per token) so token logs look realistic.
             usage=SimpleNamespace(input_tokens=prompt_chars // 4, output_tokens=len(text) // 4),
         )
+
+
+def _pick_stub_reply(agent: str, prompt: str) -> str:
+    """Pick the canned reply for this point in the conversation.
+
+    A list of replies is played in order: the Nth reply for the Nth turn by
+    this speaker. The last item repeats if the conversation runs longer.
+    """
+    reply = STUB_REPLIES[agent]
+    if isinstance(reply, list):
+        earlier_turns = prompt.count(STUB_TURN_MARKERS[agent])
+        reply = reply[min(earlier_turns, len(reply) - 1)]
+    return reply if isinstance(reply, str) else json.dumps(reply)

@@ -22,7 +22,7 @@ Full spec: `docs/design-spec.md`. Personas: `docs/personas.md`. Interview questi
 | --- | --- | --- | --- |
 | prep | persona summary (segment, job hypothesis), JTBD question bank | Interview Prep JSON | Interview Prep |
 | interviewer | prep JSON, transcript so far | next question, or `{"action": "end"}` | none |
-| user (synthetic) | full persona, transcript so far | one in-character answer | none |
+| user (synthetic) | persona without the job hypothesis, this run's recent task, transcript so far | one in-character answer | none |
 | debrief | transcript only | User Debrief JSON with `evidence_turns` | User Debrief |
 | advocate (devil's advocate) | persona, transcript, debrief | critique JSON with confidence rating | none |
 | synthesis | approved debriefs, critiques | cross-segment report | none |
@@ -38,8 +38,8 @@ Full spec: `docs/design-spec.md`. Personas: `docs/personas.md`. Interview questi
 
 - The interviewer speaks first. The code relays turns between the interviewer and the user agent.
 - Stop when the first of these happens: the interviewer returns `end`, 20 interviewer turns, the 40,000-token budget per interview, or 3 user answers in a row under 10 words.
-- 3 runs per persona. Temperature 0.3 for the interviewer, 0.9 for the user.
-- A critique rated `low` triggers one rerun with a new seed. A second `low` goes to human review flagged.
+- 3 runs per persona. Each run gives the synthetic user a different task from the persona's `recent_tasks`; that is what makes runs differ. Don't set temperature: current models accept only the default.
+- A critique rated `low` triggers one rerun of that run. A second `low` goes to human review flagged.
 - Only debriefs approved in the human review step reach synthesis.
 
 ## Quality layer
@@ -61,10 +61,11 @@ harness/
   orchestrator.py  run_persona() and the main loop
   schemas.py       Pydantic models
   transcript.py    append-only JSONL writer
+  stub_replies.json canned replies for --dry-run
   review.py        human review CLI
   render.py        renders prep and debrief JSON to Markdown laid out like the templates
 runs/              outputs: runs/<persona_id>/<run>/
-tests/             test_isolation.py, test_schemas.py, test_stop_rules.py
+tests/             test_isolation.py, test_schemas.py, test_interview.py, test_stop_rules.py
 module9_agent_sdk/ the Agent SDK rebuild
 ```
 

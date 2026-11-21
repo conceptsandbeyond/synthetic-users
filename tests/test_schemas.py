@@ -37,7 +37,7 @@ def test_summary_shows_segment_and_job_only():
     for p in PERSONAS:
         summary = p.summary()
         assert p.segment in summary and p.job_hypothesis in summary
-        for private in [p.name, p.location, *p.behaviors, *p.objections, *p.current_alternatives]:
+        for private in [p.name, p.location, *p.behaviors, *p.objections, *p.current_alternatives, *p.recent_tasks]:
             assert private not in summary
 
 
@@ -64,7 +64,7 @@ def test_dry_run_prep_is_valid_and_logged(tmp_path):
 
 # --- Module 2: validation and retry -----------------------------------------
 
-VALID_PREP = agents.CANNED_REPLIES["prep"]
+VALID_PREP = json.dumps(agents.STUB_REPLIES["prep"])
 
 
 def fake_model(monkeypatch, *replies):

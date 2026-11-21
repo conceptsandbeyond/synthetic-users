@@ -1,5 +1,5 @@
 # Harness configuration. Model names live here and nowhere else.
-# Later modules add interview limits, budgets and the isolation allow-list.
+# Later modules add budgets and the isolation allow-list.
 
 models:
   prep: claude-sonnet-5-5
@@ -12,6 +12,10 @@ models:
 # Upper limit on each model reply. Generous on purpose: a reply cut off
 # mid-JSON is worse than a few unused tokens.
 max_tokens: 16000
+
+interview:
+  # Safety cap. The interviewer normally ends the interview itself.
+  max_interviewer_turns: 20
 
 # Relative to the repo root.
 paths:

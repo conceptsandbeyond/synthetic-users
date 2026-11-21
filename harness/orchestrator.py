@@ -1,9 +1,8 @@
-"""Module 1 entry point: run the prep agent for each persona.
+"""The orchestrator: prep an interview, then run it, for each persona.
 
-This file grows into the full pipeline over the next modules. For now it does
-one job: load personas, prepare an interview for each, and save the result.
-The orchestrator is plain Python on purpose. Only the prep itself needs
-judgment, so only the prep calls a model.
+This file grows into the full pipeline over the modules. It is plain Python
+on purpose. The code decides who speaks next, what each agent sees and when
+to stop. Only the steps that need judgment call a model.
 
     python -m harness.orchestrator --dry-run --personas p01
 """
@@ -17,8 +16,9 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-from harness.agents import AgentError, OutputInvalid, call_agent_json
-from harness.schemas import InterviewPrep, Persona, describe_error
+from harness.agents import AgentError, OutputInvalid, call_agent, call_agent_json
+from harness.schemas import InterviewerTurn, InterviewPrep, Persona, describe_error
+from harness.transcript import Transcript
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -82,8 +82,46 @@ def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> Interview
     return prep
 
 
+def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int = 1,
+                  dry_run: bool = False) -> tuple[Transcript, str]:
+    """Run one interview and return the transcript and the reason it stopped.
+
+    The code relays every turn. The two agents never talk to each other
+    directly: each call is built fresh from what that agent is allowed to see.
+    """
+    run_dir = config["paths"]["runs"] / persona.id / f"run-{run}"
+    transcript = Transcript(run_dir / "transcript.jsonl")
+    # Each run talks about a different recent task. That's what makes repeat runs differ.
+    task = persona.recent_tasks[(run - 1) % len(persona.recent_tasks)]
+    prep_text = prep.model_dump_json(indent=2, exclude={"persona_id"})
+    # The user never sees the job hypothesis: knowing what's being tested invites it to confirm it.
+    profile = persona.model_dump_json(indent=2, exclude={"id", "job_hypothesis", "recent_tasks"})
+
+    # A safety cap so one interviewer that never says "end" can't run up a bill.
+    # Module 5 adds the other stop rules.
+    for _ in range(config["interview"]["max_interviewer_turns"]):
+        # Both prompts are built by hand for now. Module 4 moves this into build_context().
+        move = call_agent_json(
+            "interviewer",
+            f"Interview prep:\n{prep_text}\n\nTranscript so far:\n{transcript.render()}",
+            InterviewerTurn, config, run_dir, dry_run,
+        )
+        if move.action == "end":
+            return transcript, "interviewer ended"
+        transcript.add("interviewer", move.question)
+
+        answer = call_agent(
+            "user",
+            f"Your profile:\n{profile}\n\nThe recent task this interview is about:\n{task}\n\n"
+            f"Transcript so far:\n{transcript.render()}",
+            config, run_dir, dry_run,
+        )
+        transcript.add("user", answer)
+    return transcript, "turn cap"
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the prep agent for each persona.")
+    parser = argparse.ArgumentParser(description="Prep and run one interview for each persona.")
     parser.add_argument("--dry-run", action="store_true", help="use the stub model: no API key, no cost")
     parser.add_argument("--personas", help="comma-separated id prefixes, e.g. p01,p05")
     args = parser.parse_args()
@@ -97,16 +135,16 @@ def main() -> None:
         # One persona failing shouldn't stop the other nine.
         try:
             prep = run_prep(persona, config, dry_run=args.dry_run)
+            transcript, stopped_by = run_interview(persona, prep, config, dry_run=args.dry_run)
         except AgentError as error:
             failed.append(persona.id)
             print(f"{persona.id}: FAILED. {error}")
             continue
-        print(f"{persona.id}: {len(prep.starter_questions)} starter and "
-              f"{len(prep.contrasting_questions)} contrasting questions -> runs/{persona.id}/prep/prep.json")
+        print(f"{persona.id}: {len(transcript.turns)} turns, stopped by {stopped_by} -> {transcript.path.relative_to(REPO_ROOT)}")
 
-    print(f"\n{len(personas) - len(failed)} of {len(personas)} preps succeeded.")
+    print(f"\n{len(personas) - len(failed)} of {len(personas)} interviews completed.")
     if failed:
-        print(f"Failed: {', '.join(failed)}. See failed.json and calls.jsonl in each prep folder.")
+        print(f"Failed: {', '.join(failed)}. See failed.json and calls.jsonl in each persona's folders.")
         sys.exit(1)
 
 

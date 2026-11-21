@@ -1,0 +1,46 @@
+{
+  "_comment": "Canned replies for --dry-run. A list is played in order, one item per earlier turn by the same speaker.",
+  "prep": {
+    "key_hypotheses": [
+      "The job hypothesis describes a real, recent struggle, not a general wish",
+      "The current workaround costs time, accuracy or independence",
+      "The current workaround is good enough and nothing would change"
+    ],
+    "interviewee_profile": "Someone in this segment who has done a leveling task in the last month. Screen out anyone who has never done one.",
+    "starter_questions": [
+      "Tell me about the last time you had to get something level.",
+      "What made that the day you did it?",
+      "Who else was around while you worked?",
+      "How did you know it was straight?",
+      "When did you find out whether it really was level?"
+    ],
+    "contrasting_questions": [
+      "Was the bigger problem the time it took or the result?",
+      "Why that method rather than asking someone for help?",
+      "What's worse about your current method than the one before it?",
+      "Would you rather it be faster or more accurate?"
+    ]
+  },
+  "interviewer": [
+    {
+      "action": "ask",
+      "question": "Tell me about the last time you had to get something level."
+    },
+    {
+      "action": "ask",
+      "question": "How did you know it was straight?"
+    },
+    {
+      "action": "ask",
+      "question": "What did you do when it turned out to be off?"
+    },
+    {
+      "action": "end"
+    }
+  ],
+  "user": [
+    "It was a set of shelves a couple of weeks ago. I'd put it off for a while, then finally did it on a Saturday morning.",
+    "I used the level app on my phone and checked it twice. Honestly I wasn't completely sure until someone else looked at it.",
+    "I took the bracket down, moved it a bit and redid one screw. It added maybe half an hour, which was annoying but not the end of the world."
+  ]
+}

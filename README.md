@@ -6,49 +6,51 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 2: structured outputs
+## Module 3: two agents talking
 
-**Goal.** Never pass an unchecked model reply downstream. Every reply is parsed into its Pydantic model. A reply that fails gets one retry that shows the model its own reply and what was wrong. A second failure is saved for inspection and the harness moves on.
+**Goal.** Run a real interview. The interviewer asks, the synthetic user answers, and plain Python relays each turn between them. Every turn is written to disk the moment it happens.
 
-Module 1's README is on the `module-01-solution` branch.
+Earlier modules' READMEs are on their `module-NN-solution` branches.
 
 **Files that change**
 
 | File | What changes |
 | --- | --- |
-| `harness/schemas.py` | `InterviewPrep` now enforces the counts the prompt asks for. New `parse_reply()` strips a code fence and validates. New `describe_error()` turns errors into one line per problem. |
-| `harness/agents.py` | New `call_agent_json()`: call, validate, retry once with the error, then raise `OutputInvalid`. `call_agent()` is unchanged and still the only function that calls a model. |
-| `harness/orchestrator.py` | `run_prep()` uses `call_agent_json()` and writes `failed.json` on a double failure. The main loop keeps going when one persona fails and prints a summary. |
-| `tests/test_schemas.py` | Six tests that drive the retry with a fake model, no API key needed. |
+| `harness/transcript.py` | New. `Transcript` appends each turn to `transcript.jsonl` as it happens and renders the conversation as text for the next prompt. |
+| `harness/orchestrator.py` | New `run_interview()`: the turn-taking loop. `main()` now preps and then interviews each persona. |
+| `harness/schemas.py` | New `Turn` (one transcript line) and `InterviewerTurn` (a question or `end`). `Persona` gains `recent_tasks`. |
+| `prompts/interviewer.md`, `prompts/user.md` | New system prompts for the two agents. |
+| `personas/*.json` | Three `recent_tasks` each. Run N talks about task N. |
+| `harness/stub_replies.json` | The dry-run replies, moved out of the code. The stub interviewer asks three questions and ends. |
+| `config.yaml` | `interview.max_interviewer_turns`, a safety cap. |
+| `tests/test_interview.py` | New tests for the loop and the transcript. |
 
 **Run it**
 
 ```bash
 pytest
-python -m harness.orchestrator --dry-run --personas p01
-python -m harness.orchestrator --personas p01
+python -m harness.orchestrator --dry-run --personas p05
+python -m harness.orchestrator --personas p05
 ```
 
-**Exercise: break the prompt on purpose**
+**Exercise: read one interview aloud**
 
-This needs an API key. Run each break against p01, read `calls.jsonl`, then undo it.
+Run one real interview, then read `runs/<persona_id>/run-1/transcript.jsonl` aloud in class, with one person as the interviewer and one as the interviewee. Then discuss:
 
-1. In `prompts/prep.md`, change "5 to 7 contextual questions" to "2 or 3". The reply is valid JSON but breaks the schema. Watch the retry prompt tell the model `starter_questions` needs at least 5, and see whether it follows the error or the prompt.
-2. Delete the last paragraph of `prompts/prep.md`, the one that describes the JSON. Does the retry rescue it, or do you get a `failed.json`?
-3. Ask for a reply in Markdown instead of JSON. Two failures in a row should leave `failed.json` and a non-zero exit code.
+1. Where did the interviewer follow up on something the interviewee said, and where did it just move to the next prepared question?
+2. Did the interviewee ever push back, or name a reason the current method is good enough?
+3. Find one answer that sounds like a real person and one that sounds like a model. What's the difference?
 
 **What good output looks like**
 
-- A normal run makes one call per persona. `calls.jsonl` has one line.
-- A rescued run has two lines. The second prompt ends with "Your previous reply could not be used", then the bad reply and a short list of what was wrong.
-- A failed persona has `failed.json` with the error and both replies, the other personas still finish, and the summary names the failures.
+- The interviewer opens with a question about one recent task and keeps returning to it.
+- Follow-ups use the interviewee's own words: "You said you checked it twice. What made you check again?"
+- The interviewee answers in a few spoken sentences, mentions what they do today, and doesn't fall in love with anything.
+- The run ends with "stopped by interviewer ended", usually after 10 to 16 questions. "Stopped by turn cap" means the interviewer prompt needs work.
 
 **Things to notice**
 
-- The schema is a contract the prompt makes. Valid JSON can still break it, so the counts in `InterviewPrep` matter as much as the JSON parsing does. Change the prompt and the schema together.
-- A code fence gets fixed in code, not with a retry. Fix whatever is predictable in code and save retries for real mistakes. The raw reply, fence included, is still in `calls.jsonl`.
-- Retry once, not forever. A prompt that fails twice is broken, and more retries just make that cost more.
-
-**In production**
-
-The Claude API can enforce a JSON schema for you through its structured outputs feature, so replies always parse. This harness doesn't use it, because then you'd never see the failures this module is about. Even with it, checks that need context still need code and a retry. Module 6's check that every `evidence_turns` value exists in the transcript is one of those.
+- Nobody talks to anybody. Each agent call is built fresh from what that agent may see, plus the transcript so far. The "conversation" exists only in `transcript.jsonl`.
+- The user agent never sees the job hypothesis. If it knew what was being tested, it would drift toward confirming it.
+- Repeat runs differ because each run talks about a different recent task, not because of randomness. Module 6 runs all three.
+- Both prompts are still built by hand inside `run_interview()`. Nothing stops a careless edit from showing the interviewer the persona. That's the problem module 4 solves.
