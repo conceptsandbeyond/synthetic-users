@@ -24,6 +24,10 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 | `config.yaml` | `runs_per_persona`, `parallel_personas`, and the debrief's allow-list (`transcript` only). |
 | `tests/test_pipeline.py` | New tests for the three runs, rendering, debrief isolation, evidence checks and the parallel run. |
 
+**Your task**
+
+You're on the `module-06-start` branch. The debrief agent, evidence check, renderer, thread pool and tests are in place. `run_persona()` in `harness/orchestrator.py` is empty: the code that preps once, then interviews and debriefs each run. Its docstring lists the steps. Build it until `pytest` passes, then compare with the `module-06-solution` branch.
+
 **Run it**
 
 ```bash

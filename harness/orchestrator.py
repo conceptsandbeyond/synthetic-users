@@ -205,28 +205,20 @@ def run_persona(persona: Persona, config: dict, spend: RunSpend, dry_run: bool =
 
     Returns (succeeded, message) for each run. A failed run is reported and
     the next run still goes ahead.
-    """
-    try:
-        prep = run_prep(persona, config, dry_run)
-    except AgentError as error:
-        return [(False, f"{persona.id} prep: FAILED. {error}")]
 
-    results = []
-    for run in range(1, config["runs_per_persona"] + 1):
-        label = f"{persona.id} run {run}"
-        if spend.over_cap():
-            results.append((False, f"{label}: SKIPPED. The run has spent {spend.spent:,} tokens."))
-            continue
-        try:
-            interview = run_interview(persona, prep, config, run, dry_run)
-            spend.add(interview.tokens)
-            run_debrief(persona, interview, config, dry_run)
-        except AgentError as error:
-            results.append((False, f"{label}: FAILED. {error}"))
-            continue
-        results.append((True, f"{label}: {len(interview.transcript.turns)} turns, stopped by "
-                              f"{interview.stopped_by}, {interview.tokens:,} tokens, debriefed"))
-    return results
+    TODO (module 6): build the pipeline for one persona.
+      1. Run run_prep(). If it raises AgentError, return
+         [(False, f"{persona.id} prep: FAILED. {error}")].
+      2. For run in 1 to config["runs_per_persona"]:
+         a. If spend.over_cap(), record (False, "... SKIPPED ...") and move on.
+         b. Run run_interview() for this run, add its tokens to spend, then
+            run run_debrief() on the result.
+         c. If either raises AgentError, record (False, "... FAILED ...") and
+            go on to the next run.
+         d. Otherwise record (True, a one-line summary of the run).
+      3. Return the list of results.
+    """
+    raise NotImplementedError("Module 6: build run_persona()")
 
 
 def main() -> None:
