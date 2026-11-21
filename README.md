@@ -23,6 +23,12 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 | `harness/orchestrator.py` | `run_prep()` and `run_interview()` call `build_context()` instead of formatting prompts themselves. |
 | `tests/test_isolation.py` | New. Audits `calls.jsonl` for all 10 personas, and checks every way `build_context()` can refuse. |
 
+**Your task**
+
+You're on the `module-04-start` branch. The allow-list, the `ARTIFACTS` table, the orchestrator changes and the isolation tests are in place. `build_context()` in `harness/context.py` is empty. Its docstring lists the steps. Build it until `pytest` passes, then compare with the `module-04-solution` branch.
+
+Before you start, almost every test fails, because every prompt now goes through `build_context()`. That's the point of this module.
+
 **Run it**
 
 ```bash

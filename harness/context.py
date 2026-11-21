@@ -33,19 +33,17 @@ def build_context(agent: str, config: dict, **artifacts) -> str:
     Raises IsolationError if the agent has no allow-list, if an artifact
     isn't on its list, or if one on its list is missing. The last check stops
     a prompt from quietly going out without, say, the transcript.
-    """
-    allowed = config["isolation"].get(agent)
-    if allowed is None:
-        raise IsolationError(f"{agent!r} has no allow-list under isolation in config.yaml")
-    not_allowed = set(artifacts) - set(allowed)
-    if not_allowed:
-        raise IsolationError(f"{agent} may not see: {', '.join(sorted(not_allowed))}")
-    missing = set(allowed) - set(artifacts)
-    if missing:
-        raise IsolationError(f"{agent} needs: {', '.join(sorted(missing))}")
 
-    sections = []
-    for name in allowed:  # config order, so prompts read the same every time
-        heading, render = ARTIFACTS[name]
-        sections.append(f"{heading}:\n{render(artifacts[name])}")
-    return "\n\n".join(sections)
+    TODO (module 4): build this function.
+      1. Look up the agent's allow-list: config["isolation"].get(agent).
+         Raise IsolationError if there is none.
+      2. Raise IsolationError naming any artifact passed in that isn't on the list.
+      3. Raise IsolationError naming any artifact on the list that wasn't passed in.
+      4. For each name on the list, in list order, look up (heading, render) in
+         ARTIFACTS and make a section: f"{heading}:\n{render(artifacts[name])}".
+      5. Join the sections with a blank line between them and return the result.
+    The tests look for these phrases in the error messages: "no allow-list",
+    "may not see: <names>" and "needs: <names>", with names sorted and
+    separated by ", ".
+    """
+    raise NotImplementedError("Module 4: build build_context()")
