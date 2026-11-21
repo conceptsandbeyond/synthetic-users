@@ -32,6 +32,10 @@ A fourth limit, `run_token_cap`, stops the harness from starting new interviews 
 | `config.yaml` | The budget, stall settings and `run_token_cap`. |
 | `tests/test_stop_rules.py` | New. Unit tests for each rule, plus real-loop tests with a terse user and a tiny budget. |
 
+**Your task**
+
+You're on the `module-05-start` branch. The token meter, the loop that calls the stop rules, `summary.json` and the tests are in place. `stop_rule_hit()` in `harness/orchestrator.py` is empty. Its docstring lists the steps. Build it until `pytest` passes, then compare with the `module-05-solution` branch.
+
 **Run it**
 
 ```bash

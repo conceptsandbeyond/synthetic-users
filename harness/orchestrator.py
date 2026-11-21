@@ -98,19 +98,16 @@ def stop_rule_hit(transcript: Transcript, tokens_used: int, config: dict) -> str
     Checked before every interviewer turn. These rules protect the budget and
     catch interviews that have gone wrong. A healthy interview ends earlier,
     when the interviewer decides it has heard enough.
+
+    TODO (module 5): build this function. Read the limits from config["interview"].
+      1. If the transcript has max_interviewer_turns or more interviewer turns,
+         return "turn cap".
+      2. If tokens_used is at or over token_budget_per_interview, return "token budget".
+      3. Take the last stall_answers user turns. If there are that many and every
+         one has fewer than stall_min_words words, return "stalled".
+      4. Otherwise return None.
     """
-    limits = config["interview"]
-    questions = sum(t.speaker == "interviewer" for t in transcript.turns)
-    if questions >= limits["max_interviewer_turns"]:
-        return "turn cap"
-    if tokens_used >= limits["token_budget_per_interview"]:
-        return "token budget"
-    answers = [t for t in transcript.turns if t.speaker == "user"][-limits["stall_answers"]:]
-    if len(answers) == limits["stall_answers"] and all(
-        len(t.text.split()) < limits["stall_min_words"] for t in answers
-    ):
-        return "stalled"
-    return None
+    raise NotImplementedError("Module 5: build stop_rule_hit()")
 
 
 def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int = 1,
