@@ -1,4 +1,4 @@
-"""The orchestrator: prep, interview, debrief and critique every persona.
+"""The orchestrator: prep, interview, debrief and critique every persona, then synthesize.
 
 This file grows into the full pipeline over the modules. It is plain Python
 on purpose. The code decides who speaks next, what each agent sees and when
@@ -23,9 +23,9 @@ from dotenv import load_dotenv
 from harness.agents import AgentError, OutputInvalid, TokenMeter, call_agent, call_agent_json
 from harness.checks import check_questions
 from harness.context import build_context
-from harness.render import render_debrief, render_prep
-from harness.schemas import (Critique, InterviewerTurn, InterviewPrep, Persona, UserDebrief,
-                             check_evidence, describe_error)
+from harness.render import render_debrief, render_prep, render_synthesis
+from harness.schemas import (Critique, InterviewerTurn, InterviewPrep, Persona, SynthesisReport, UserDebrief,
+                             check_evidence, check_persona_ids, describe_error)
 from harness.transcript import Transcript
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -291,14 +291,72 @@ def run_persona(persona: Persona, config: dict, spend: RunSpend, dry_run: bool =
     return messages
 
 
+def latest_attempts(runs_dir: Path) -> list[Path]:
+    """Return the folder of the latest attempt of every critiqued run: the rerun if there was one."""
+    attempts = []
+    for run_dir in sorted(runs_dir.glob("p*/run-*")):
+        if run_dir.name.endswith("-rerun"):
+            continue
+        rerun = run_dir.with_name(run_dir.name + "-rerun")
+        latest = rerun if rerun.exists() else run_dir
+        if (latest / "critique.json").exists():
+            attempts.append(latest)
+    return attempts
+
+
+def approved_runs(runs_dir: Path) -> list[tuple[UserDebrief, Critique]]:
+    """Load the debrief and critique of every run a person approved in review.py."""
+    approved = []
+    for run_dir in latest_attempts(runs_dir):
+        review = run_dir / "review.json"
+        if review.exists() and json.loads(review.read_text())["decision"] == "approved":
+            approved.append((UserDebrief.model_validate_json((run_dir / "debrief.json").read_text()),
+                             Critique.model_validate_json((run_dir / "critique.json").read_text())))
+    return approved
+
+
+def run_synthesis(config: dict, dry_run: bool = False) -> SynthesisReport:
+    """Compare approved runs across segments and save report.json and report.md.
+
+    Only debriefs a person approved get here. Nothing the human gate rejected
+    or skipped can shape the conclusions.
+    """
+    approved = approved_runs(config["paths"]["runs"])
+    if not approved:
+        raise AgentError("No approved debriefs yet. Run python -m harness.review first.")
+    debriefs, critiques = [d for d, _ in approved], [c for _, c in approved]
+    out_dir = fresh_dir(config["paths"]["runs"] / "synthesis")
+    try:
+        report = call_agent_json(
+            "synthesis", build_context("synthesis", config, approved_debriefs=debriefs, critiques=critiques),
+            SynthesisReport, config, out_dir, dry_run,
+            check=lambda r: check_persona_ids(r, {d.persona_id for d in debriefs}),
+        )
+    except OutputInvalid as failure:
+        save_failure(out_dir, failure)
+        raise
+    (out_dir / "report.json").write_text(report.model_dump_json(indent=2))
+    (out_dir / "report.md").write_text(render_synthesis(report, len(debriefs)))
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prep, interview, debrief and critique each persona.")
     parser.add_argument("--dry-run", action="store_true", help="use the stub model: no API key, no cost")
     parser.add_argument("--personas", help="comma-separated id prefixes, e.g. p01,p05")
+    parser.add_argument("--synthesize", action="store_true", help="after review: compare the approved debriefs")
     args = parser.parse_args()
 
     load_dotenv(REPO_ROOT / ".env")
     config = load_config()
+    if args.synthesize:
+        try:
+            run_synthesis(config, dry_run=args.dry_run)
+        except AgentError as error:
+            sys.exit(str(error))
+        print(f"Synthesis saved to {(config['paths']['runs'] / 'synthesis' / 'report.md').relative_to(REPO_ROOT)}")
+        return
+
     wanted = args.personas.split(",") if args.personas else None
     personas = load_personas(config["paths"]["personas"], wanted)
     spend = RunSpend(config["run_token_cap"])
@@ -313,8 +371,9 @@ def main() -> None:
                 results.append(ok)
 
     print(f"\n{sum(results)} of {len(results)} runs completed, {spend.spent:,} interview tokens in total.")
+    print("Next: review the debriefs with python -m harness.review")
     if not all(results):
-        print("Look for failed-<agent>.json and calls.jsonl in the folders named above.")
+        print("Some runs failed. Look for failed-<agent>.json and calls.jsonl in the folders named above.")
         sys.exit(1)
 
 

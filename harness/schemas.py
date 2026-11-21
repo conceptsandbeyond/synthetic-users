@@ -155,6 +155,38 @@ class Critique(BaseModel):
     confidence: Literal["low", "medium", "high"]
 
 
+class SharedJob(BaseModel):
+    job: str
+    persona_ids: list[str] = Field(min_length=1)
+    evidence: str
+
+
+class SegmentVerdict(BaseModel):
+    persona_id: str
+    why: str
+
+
+class SynthesisReport(BaseModel):
+    """The synthesis agent's cross-segment report, built only from approved debriefs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    shared_jobs: list[SharedJob]
+    strongest_segment: SegmentVerdict
+    weakest_segment: SegmentVerdict
+    claims_to_verify: list[str] = Field(min_length=1)
+    caveats: list[str]
+
+
+def check_persona_ids(report: SynthesisReport, approved: set[str]) -> None:
+    """Raise ValueError if the report cites a persona with no approved debrief."""
+    cited = {pid for job in report.shared_jobs for pid in job.persona_ids}
+    cited |= {report.strongest_segment.persona_id, report.weakest_segment.persona_id}
+    unknown = sorted(cited - approved)
+    if unknown:
+        raise ValueError(f"persona_ids {unknown} have no approved debrief. Use only: {sorted(approved)}")
+
+
 def check_evidence(debrief: UserDebrief, turns: list[Turn]) -> None:
     """Raise ValueError unless every cited turn is an answer in this transcript.
 

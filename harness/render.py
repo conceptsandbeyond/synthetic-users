@@ -5,7 +5,7 @@ class materials. Every one starts with the banner so nothing synthetic is
 ever mistaken for real research.
 """
 
-from harness.schemas import InterviewPrep, Turn, UserDebrief
+from harness.schemas import InterviewPrep, SynthesisReport, Turn, UserDebrief
 
 BANNER = "> **Synthetic interview, not real user data.**"
 
@@ -70,4 +70,30 @@ def render_debrief(debrief: UserDebrief, turns: list[Turn]) -> str:
 
 ## Opportunities
 {bullets(debrief.opportunities)}
+"""
+
+
+def render_synthesis(report: SynthesisReport, run_count: int) -> str:
+    """Lay out the cross-segment report."""
+    jobs = "\n".join(f"- **{j.job}** ({', '.join(j.persona_ids)})\n  {j.evidence}" for j in report.shared_jobs)
+    return f"""{BANNER}
+
+# Cross-segment synthesis
+
+*Built from {run_count} approved debriefs.*
+
+## Shared jobs
+{jobs or "- (none)"}
+
+## Strongest segment: {report.strongest_segment.persona_id}
+{report.strongest_segment.why}
+
+## Weakest segment: {report.weakest_segment.persona_id}
+{report.weakest_segment.why}
+
+## Claims to verify in real interviews
+{bullets(report.claims_to_verify)}
+
+## Caveats
+{bullets(report.caveats)}
 """

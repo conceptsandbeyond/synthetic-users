@@ -67,7 +67,7 @@ harness/
   render.py        renders prep and debrief JSON to Markdown laid out like the templates
 runs/              outputs: runs/<persona_id>/<run>/
 tests/             test_isolation.py, test_schemas.py, test_interview.py, test_stop_rules.py,
-                   test_pipeline.py, test_evaluation.py
+                   test_pipeline.py, test_evaluation.py, test_review.py
 module9_agent_sdk/ the Agent SDK rebuild
 ```
 
@@ -103,6 +103,7 @@ pytest
 python -m harness.orchestrator --dry-run --personas p01
 python -m harness.orchestrator --personas p01
 python -m harness.review
+python -m harness.orchestrator --synthesize
 ```
 
 ## How to work in this repo

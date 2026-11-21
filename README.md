@@ -6,9 +6,9 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 7: evaluation
+## Module 8: human in the loop
 
-**Goal.** Catch weak results before a person reads them. Each run now gets two checks. The devil's advocate agent assumes the debrief is wrong until the evidence proves otherwise, and it's the only agent with a tool: web search for the reality-anchor check. The interviewer check is plain code that flags leading questions and questions about the future. A run the advocate rates `low` is rerun once. A second `low` is flagged for human review.
+**Goal.** Put a person between the agents and the conclusions. `review.py` shows each run's debrief, critique and interviewer check, and the reviewer approves, rejects or edits it. Only approved debriefs reach the synthesis agent, which compares segments and lists what real interviews have to verify.
 
 Earlier modules' READMEs are on their `module-NN-solution` branches.
 
@@ -16,41 +16,39 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 
 | File | What changes |
 | --- | --- |
-| `prompts/advocate.md` | New. Seven checks, each rated pass, warn or fail, plus a confidence rule. |
-| `harness/schemas.py` | New `Checks` and `Critique`. |
-| `harness/checks.py` | New. `check_questions()`, the interviewer check, built from regular expressions. |
-| `harness/agents.py` | `call_agent()` attaches server tools from config, resumes a paused search, keeps only the text after the last search result, and logs each call's tools. |
-| `harness/context.py` | New artifacts for the advocate: the full `persona`, this run's `debrief`, and `other_debriefs`. |
-| `harness/orchestrator.py` | New `run_once()`, `run_critique()` and `evaluate_run()`. Critiques wait until all runs are done. A low rating reruns into `run-N-rerun/`. `summary.json` records the confidence and whether the run is flagged. |
-| `config.yaml` | The advocate's allow-list, and `tools: advocate: [web_search]`. |
-| `tests/test_evaluation.py` | New tests for critiques, advocate isolation, tool access, the rerun rule, the interviewer check and resuming a paused search. |
+| `harness/review.py` | New. The review command line: `pending_runs()`, `show()`, `review_run()` and `edit_debrief()`. Flagged runs come first. Decisions go to `review.json`. |
+| `prompts/synthesis.md` | New. Compares approved debriefs, weighted by their critiques. |
+| `harness/schemas.py` | New `SynthesisReport`, plus `check_persona_ids()`: the report may cite only personas with an approved debrief. |
+| `harness/orchestrator.py` | New `latest_attempts()`, `approved_runs()` and `run_synthesis()`, and a `--synthesize` flag. |
+| `harness/render.py`, `harness/context.py`, `config.yaml` | The synthesis report renderer, its two artifacts and its allow-list. |
+| `tests/test_review.py` | New tests for approving, rejecting, editing, review order and synthesis. |
 
 **Run it**
 
 ```bash
-pytest tests/test_evaluation.py -v
-python -m harness.orchestrator --dry-run --personas p10
-python -m harness.orchestrator --personas p10
+python -m harness.orchestrator --dry-run --personas p01,p10
+python -m harness.review
+python -m harness.orchestrator --dry-run --synthesize
 ```
 
-**Exercise: find a run the critic rates low**
+`edit` opens `debrief.json` in `$EDITOR` (nano if unset). An edit has to pass the same schema and evidence checks as the agent's output, or it's undone.
 
-Run all ten personas for real, then find every `summary.json` with `"confidence": "low"`.
+**Exercise: be the gate, then judge the result**
 
-1. Read that run's `critique.json`. Which checks failed, and do you agree after reading the transcript?
-2. Look at the rerun in `run-N-rerun/`. Did it fix the problem? If not, is the problem the persona, the user prompt or the interviewer prompt? Try a prompt fix before a code fix.
-3. Open `interviewer_check.json` for a few runs. Find one flag you agree with and one false alarm. What would it take to catch the subtle leading questions the patterns miss?
+Run all ten personas for real, then review all thirty runs.
+
+1. Approve or reject every run. Write a reason for every rejection. Which check did you lean on most: the quotes in the debrief, the critique or the transcript?
+2. Run the synthesis and read `runs/synthesis/report.md`. Do you agree with the strongest and weakest segment? Find one shared job you think the evidence doesn't support.
+3. Change one decision, approving a run you rejected or the other way round, and synthesize again. How much did one run move the conclusions?
 
 **What good output looks like**
 
-- Each run folder has `critique.json` and `interviewer_check.json`, and its `summary.json` has `confidence` and `flagged`.
-- Most runs come back `medium`. A wall of `high` ratings is suspicious: a devil's advocate that agrees with everything isn't doing its job.
-- The `sources` in a critique are real pages about real people doing this job: forums, research or advocacy organizations.
+- Every run folder has a `review.json` with a decision, a note and whether it was edited.
+- `runs/synthesis/report.md` starts with the banner, cites only approved personas, and ends with claims to verify and caveats, not a recommendation to build.
 
 **Things to notice**
 
-- The advocate is the only agent that sees everything: persona, transcript, debrief and the other runs. Its job is to find gaps between them.
-- It runs on a stronger model than the agents it checks, but it shares their blind spots. For p01 and p10, plan a review by two or three people from those communities before treating either persona as credible.
-- One tool, for one check. Search adds cost, latency and outside text in the prompt. It's worth that only where the answer has to come from outside the harness.
-- The interviewer check is code, not a model, so you can predict exactly what it flags. It also guarantees false alarms: "Would you rather..." is a fair contrasting question that still gets flagged as about the future.
-- One rerun, then a person. A persona that fails twice needs a human, not a third try.
+- The person comes after the cheap checks and before the conclusions. Reviewers spend their time on debriefs that already passed the schema, the evidence check and the critic.
+- An edit isn't trusted just because a person made it. It goes through the same validation as an agent's output.
+- Synthesis sees approved debriefs and their critiques, never transcripts or personas. If the review gate let it through, it can shape the conclusions; if not, it can't.
+- The synthesis agent picks a strongest and a weakest segment because the design spec asks it to. Whether it should rank at all, or leave ranking to people, is still an open question in the spec. Argue it out in class.

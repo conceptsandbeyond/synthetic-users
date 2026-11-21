@@ -101,5 +101,32 @@
     ],
     "sources": [],
     "confidence": "medium"
+  },
+  "synthesis": {
+    "shared_jobs": [
+      {
+        "job": "Finish a small fixing job once, without waiting for someone else to confirm it",
+        "persona_ids": [
+          "p01-visually-impaired-diyer",
+          "p10-senior-aging-in-place"
+        ],
+        "evidence": "Both debriefs name a second check by another person as the moment the job is really done."
+      }
+    ],
+    "strongest_segment": {
+      "persona_id": "p01-visually-impaired-diyer",
+      "why": "Depending on someone else to confirm the work is a repeated cost the interviewee wants gone."
+    },
+    "weakest_segment": {
+      "persona_id": "p10-senior-aging-in-place",
+      "why": "A redo costs little, and the current approach is described as good enough."
+    },
+    "claims_to_verify": [
+      "How often a second check is actually needed",
+      "Whether a sound would be trusted over a person's eyes"
+    ],
+    "caveats": [
+      "Two personas, synthetic interviews only"
+    ]
   }
 }

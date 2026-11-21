@@ -29,13 +29,13 @@ parallel_personas: 4
 run_token_cap: 1000000
 
 # What each agent may see. build_context() refuses anything else.
-# Module 8 adds the synthesis agent.
 isolation:
   prep: [persona_summary, question_bank]
   interviewer: [prep, transcript]
   user: [persona_profile, recent_task, transcript]
   debrief: [transcript]
   advocate: [persona, transcript, debrief, other_debriefs]
+  synthesis: [approved_debriefs, critiques]
 
 # Server tools, by agent. Only the devil's advocate gets one.
 tools:

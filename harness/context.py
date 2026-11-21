@@ -30,6 +30,14 @@ ARTIFACTS = {
         "Debriefs of this persona's other runs",
         lambda debriefs: "\n\n".join(d.model_dump_json(indent=2) for d in debriefs) or "(none)",
     ),
+    "approved_debriefs": (
+        "Approved debriefs",
+        lambda debriefs: "\n\n".join(d.model_dump_json(indent=2) for d in debriefs),
+    ),
+    "critiques": (
+        "Devil's advocate critiques of those runs",
+        lambda critiques: "\n\n".join(c.model_dump_json(indent=2) for c in critiques),
+    ),
 }
 
 
