@@ -14,7 +14,7 @@ The harness runs one pipeline per persona: prep the interview, run it between tw
 - Produce a filled Interview Prep and a filled User Debrief for every persona, matching the Concepts and Beyond templates.
 - Keep every agent's context isolated so results can't leak between agents.
 - Catch sycophantic users, leading questions and unsupported claims before a person reviews the output.
-- Keep the code small and readable enough to teach in modules (target under 600 lines of Python).
+- Keep the code small and readable enough to teach in modules (target under 800 lines of Python).
 
 **Non-goals**
 

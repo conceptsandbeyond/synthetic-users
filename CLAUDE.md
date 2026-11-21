@@ -14,7 +14,7 @@ Full spec: `docs/design-spec.md`. Personas: `docs/personas.md`. Interview questi
 - Pydantic v2 for every data contract, `pyyaml` for config, `python-dotenv` for the API key, `pytest` for tests.
 - The orchestrator is plain, deterministic Python. Only tasks that need judgment call a model.
 - Outputs are files. No web UI.
-- Keep `harness/` under about 600 lines. Short functions, with docstrings that explain why, not what.
+- Keep `harness/` under about 800 lines. Short functions, with docstrings that explain why, not what.
 
 ## Agents
 
