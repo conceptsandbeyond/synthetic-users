@@ -73,22 +73,18 @@ def edit_debrief(run_dir: Path, edit: Callable[[Path], None]) -> bool:
 
 def review_run(run_dir: Path, ask: Callable[[str], str] = input,
                edit: Callable[[Path], None] = open_in_editor) -> str:
-    """Ask for a decision on one run and save it to review.json. Returns the choice made."""
-    edited = False
-    while True:
-        choice = ask("[a]pprove, [r]eject, [e]dit, [s]kip, [q]uit: ").strip().lower()[:1]
-        if choice in ("a", "r"):
-            decision = "approved" if choice == "a" else "rejected"
-            note = ask("Note (optional): " if choice == "a" else "Why reject it? ").strip()
-            review = {"decision": decision, "edited": edited, "note": note,
-                      "ts": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-            (run_dir / "review.json").write_text(json.dumps(review, indent=2))
-            return decision
-        if choice == "e":
-            edited = edit_debrief(run_dir, edit) or edited
-            print("Edit saved. Now approve or reject the edited debrief." if edited else "")
-        elif choice in ("s", "q"):
-            return {"s": "skipped", "q": "quit"}[choice]
+    """Ask for a decision on one run and save it to review.json. Returns the choice made.
+
+    TODO (module 8): build the decision loop. Keep asking until the reviewer decides:
+      - "a" or "r": ask for a note ("Note (optional): " or "Why reject it? "), write
+        review.json with decision ("approved" or "rejected"), edited, note and ts,
+        then return the decision.
+      - "e": call edit_debrief(run_dir, edit) and remember whether an edit was
+        saved, so review.json can record it. Then ask again.
+      - "s": return "skipped". "q": return "quit".
+    Read only the first letter of each answer, lowercased.
+    """
+    raise NotImplementedError("Module 8: build review_run()")
 
 
 def main() -> None:

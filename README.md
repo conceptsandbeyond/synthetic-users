@@ -23,6 +23,10 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 | `harness/render.py`, `harness/context.py`, `config.yaml` | The synthesis report renderer, its two artifacts and its allow-list. |
 | `tests/test_review.py` | New tests for approving, rejecting, editing, review order and synthesis. |
 
+**Your task**
+
+You're on the `module-08-start` branch. The synthesis agent, the review display, the edit validation and the tests are in place. `review_run()` in `harness/review.py` is empty: the loop that asks the reviewer for a decision and saves it. Its docstring lists the steps. Build it until `pytest` passes, then compare with the `module-08-solution` branch.
+
 **Run it**
 
 ```bash
