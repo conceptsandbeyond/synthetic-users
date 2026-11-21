@@ -21,6 +21,12 @@ Module 1's README is on the `module-01-solution` branch.
 | `harness/orchestrator.py` | `run_prep()` uses `call_agent_json()` and writes `failed.json` on a double failure. The main loop keeps going when one persona fails and prints a summary. |
 | `tests/test_schemas.py` | Six tests that drive the retry with a fake model, no API key needed. |
 
+**Your task**
+
+You're on the `module-02-start` branch. The schema limits, `parse_reply()`, `describe_error()` and the orchestrator changes are already in place. One function is missing: `call_agent_json()` in `harness/agents.py`. Its docstring lists the steps. Build it until `pytest` passes, then compare your version with the `module-02-solution` branch.
+
+Before you start, every test that goes through `call_agent_json()` fails with `NotImplementedError`. That's expected.
+
 **Run it**
 
 ```bash

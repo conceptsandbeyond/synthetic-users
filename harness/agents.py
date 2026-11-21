@@ -46,24 +46,21 @@ def call_agent_json(
     reply and the exact error. Models fix their mistakes far more reliably
     when told what went wrong than when simply asked again. A second failure
     raises OutputInvalid: retrying forever hides a broken prompt.
+
+    TODO (module 2): build this function.
+      1. Call call_agent() with user_message and keep the reply.
+      2. Try parse_reply(reply, schema, known_fields) and return the result.
+         It raises ValueError for both bad JSON and failed validation.
+      3. If it fails, build a retry message: the original user_message, then
+         "Your previous reply could not be used.", the bad reply, the
+         problems from describe_error(error), and "Reply again with
+         corrected JSON only."
+      4. Call call_agent() once more with the retry message and try
+         parse_reply() again.
+      5. If the second reply also fails, raise
+         OutputInvalid(agent, error, [first_reply, second_reply]).
     """
-    message = user_message
-    replies = []
-    for _ in range(2):  # the first try plus one retry
-        reply = call_agent(agent, message, config, log_dir, dry_run)
-        replies.append(reply)
-        try:
-            return parse_reply(reply, schema, known_fields)
-        except ValueError as error:
-            last_error = error
-            message = (
-                f"{user_message}\n\n---\n"
-                f"Your previous reply could not be used.\n\n"
-                f"Your previous reply:\n{reply}\n\n"
-                f"What was wrong:\n{describe_error(error)}\n\n"
-                f"Reply again with corrected JSON only."
-            )
-    raise OutputInvalid(agent, last_error, replies)
+    raise NotImplementedError("Module 2: build call_agent_json()")
 
 
 def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_run: bool = False) -> str:
