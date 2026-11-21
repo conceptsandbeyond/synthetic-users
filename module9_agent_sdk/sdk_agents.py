@@ -51,26 +51,17 @@ def call_agent_sdk(agent: str, user_message: str, config: dict, log_dir: Path, d
 
     The log shows the prompt we handed over. Unlike the raw API version, it
     can't show the final request: the Claude Code subprocess builds that.
+
+    TODO (module 9): build this function.
+      1. If dry_run, return messages_api_call_agent(..., dry_run=True, meter=meter):
+         the same stub serves both engines.
+      2. Build the options with sdk_options(agent, config).
+      3. Run asyncio.run(_ask(user_message, options)) and time it.
+      4. Turn result.usage (a dict) into an object with input_tokens (input plus
+         both cache counts) and output_tokens.
+      5. Log the call with _log_call(), passing options.model, options.system_prompt,
+         the user message as a messages list, result.result and options.tools.
+      6. Add the usage to the meter if there is one.
+      7. Raise AgentError if result.is_error. Otherwise return result.result.
     """
-    if dry_run:  # the same stub serves both engines
-        return messages_api_call_agent(agent, user_message, config, log_dir, dry_run=True, meter=meter)
-
-    options = sdk_options(agent, config)
-    start = time.monotonic()
-    result = asyncio.run(_ask(user_message, options))
-    latency = time.monotonic() - start
-
-    used = result.usage or {}
-    usage = SimpleNamespace(
-        input_tokens=sum(used.get(k, 0) for k in
-                         ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
-        output_tokens=used.get("output_tokens", 0),
-    )
-    text = result.result or ""
-    _log_call(log_dir, agent, options.model, usage, latency, result.stop_reason or result.subtype,
-              options.system_prompt, [{"role": "user", "content": user_message}], text, options.tools)
-    if meter:
-        meter.add(usage)
-    if result.is_error:
-        raise AgentError(f"{agent}: the Agent SDK reported an error ({result.subtype}). See {log_dir}/calls.jsonl")
-    return text
+    raise NotImplementedError("Module 9: build call_agent_sdk()")

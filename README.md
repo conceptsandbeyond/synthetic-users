@@ -21,6 +21,10 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 | `module9_agent_sdk/requirements.txt` | `claude-agent-sdk`, needed only for this module. |
 | `tests/test_module9.py` | Checks the SDK options and runs the pipeline on the SDK engine with the stub. Skipped if the SDK isn't installed. |
 
+**Your task**
+
+You're on the `module-09-start` branch. `sdk_options()`, `_ask()`, `run.py` and the tests are in place. `call_agent_sdk()` in `module9_agent_sdk/sdk_agents.py` is empty. Its docstring lists the steps. Build it until `pytest tests/test_module9.py` passes, then compare with the `module-09-solution` branch.
+
 **Run it**
 
 ```bash
