@@ -1,0 +1,2 @@
+# Module 9 only. Install on top of the main requirements.txt.
+claude-agent-sdk>=0.2.172,<0.3

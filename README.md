@@ -6,49 +6,59 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 8: human in the loop
+## Module 9: rebuild on the Claude Agent SDK
 
-**Goal.** Put a person between the agents and the conclusions. `review.py` shows each run's debrief, critique and interviewer check, and the reviewer approves, rejects or edits it. Only approved debriefs reach the synthesis agent, which compares segments and lists what real interviews have to verify.
+**Goal.** Run the same harness with the Claude Agent SDK as its engine, then compare. The SDK runs Claude Code as a subprocess: a full agent harness with built-in tools, settings files and its own system context. This module swaps it in at the one seam built in module 1, `call_agent()`, and asks what that changes.
 
 Earlier modules' READMEs are on their `module-NN-solution` branches.
 
-**Files that change**
+**Files**
 
-| File | What changes |
+| File | What it does |
 | --- | --- |
-| `harness/review.py` | New. The review command line: `pending_runs()`, `show()`, `review_run()` and `edit_debrief()`. Flagged runs come first. Decisions go to `review.json`. |
-| `prompts/synthesis.md` | New. Compares approved debriefs, weighted by their critiques. |
-| `harness/schemas.py` | New `SynthesisReport`, plus `check_persona_ids()`: the report may cite only personas with an approved debrief. |
-| `harness/orchestrator.py` | New `latest_attempts()`, `approved_runs()` and `run_synthesis()`, and a `--synthesize` flag. |
-| `harness/render.py`, `harness/context.py`, `config.yaml` | The synthesis report renderer, its two artifacts and its allow-list. |
-| `tests/test_review.py` | New tests for approving, rejecting, editing, review order and synthesis. |
+| `module9_agent_sdk/sdk_agents.py` | `call_agent_sdk()`: same arguments and return value as `call_agent()`, implemented with `query()` from `claude_agent_sdk`. `sdk_options()` turns off everything this harness doesn't want. |
+| `module9_agent_sdk/run.py` | Swaps the engine in two lines and runs the normal orchestrator. |
+| `module9_agent_sdk/requirements.txt` | `claude-agent-sdk`, needed only for this module. |
+| `tests/test_module9.py` | Checks the SDK options and runs the pipeline on the SDK engine with the stub. Skipped if the SDK isn't installed. |
 
 **Run it**
 
 ```bash
-python -m harness.orchestrator --dry-run --personas p01,p10
-python -m harness.review
-python -m harness.orchestrator --dry-run --synthesize
+pip install -r module9_agent_sdk/requirements.txt
+pytest tests/test_module9.py -v
+python -m module9_agent_sdk.run --dry-run --personas p08
+python -m module9_agent_sdk.run --personas p08
 ```
 
-`edit` opens `debrief.json` in `$EDITOR` (nano if unset). An edit has to pass the same schema and evidence checks as the agent's output, or it's undone.
+The same flags work as for `harness.orchestrator`, `--synthesize` included. Review is unchanged: `python -m harness.review`.
 
-**Exercise: be the gate, then judge the result**
+**What the swap looks like**
 
-Run all ten personas for real, then review all thirty runs.
+| | Messages API (modules 1 to 8) | Agent SDK (module 9) |
+| --- | --- | --- |
+| What runs | One HTTPS request per call | A Claude Code subprocess per call, which makes the requests |
+| Tools | None unless you add one | Built-in tools (Bash, file reading, web) unless you pass `tools=[]` |
+| Project files | Never read | `CLAUDE.md` and settings can load unless you pass `setting_sources=[]` |
+| Web search | Declared by its API type, paused turns handled by hand | Built-in `WebSearch` tool, looping handled for you |
+| What `calls.jsonl` proves | The exact request sent to the model | Only what we handed the SDK. The subprocess builds the final request |
+| Cost | Tokens from `usage` | Tokens plus `total_cost_usd` on the result message |
 
-1. Approve or reject every run. Write a reason for every rejection. Which check did you lean on most: the quotes in the debrief, the critique or the transcript?
-2. Run the synthesis and read `runs/synthesis/report.md`. Do you agree with the strongest and weakest segment? Find one shared job you think the evidence doesn't support.
-3. Change one decision, approving a run you rejected or the other way round, and synthesize again. How much did one run move the conclusions?
+**Exercise: compare the two engines**
+
+Run p08 on both engines with an API key, then compare the outputs and the logs.
+
+1. **What did the SDK hide?** Find something the module 7 version of `call_agent()` does by hand that `call_agent_sdk()` doesn't have to do.
+2. **What did it save?** Count the lines. Is the SDK version shorter? Is the whole system simpler, or is the complexity just somewhere you can't read?
+3. **Where did isolation get harder to prove?** `test_isolation.py` reads `calls.jsonl`. On the SDK engine, does a passing test still prove what the model saw? What would you need to see to be sure?
+4. **The tempting rebuild.** The SDK makes it easy to hand the whole interview to one agent with subagents for the interviewer and the user. Sketch that design, then explain how you would prove the interviewer never saw the persona. That proof is the main reason this harness keeps a plain-Python orchestrator.
 
 **What good output looks like**
 
-- Every run folder has a `review.json` with a decision, a note and whether it was edited.
-- `runs/synthesis/report.md` starts with the banner, cites only approved personas, and ends with claims to verify and caveats, not a recommendation to build.
+- Both engines produce the same files in the same places, because everything above `call_agent()` is unchanged.
+- The SDK log entries show `"tools": []` for every agent except the advocate, which shows `["WebSearch"]`.
 
 **Things to notice**
 
-- The person comes after the cheap checks and before the conclusions. Reviewers spend their time on debriefs that already passed the schema, the evidence check and the critic.
-- An edit isn't trusted just because a person made it. It goes through the same validation as an agent's output.
-- Synthesis sees approved debriefs and their critiques, never transcripts or personas. If the review gate let it through, it can shape the conclusions; if not, it can't.
-- The synthesis agent picks a strongest and a weakest segment because the design spec asks it to. Whether it should rank at all, or leave ranking to people, is still an open question in the spec. Argue it out in class.
+- The swap is two assignments in `run.py`. Module 1's rule that every model call goes through one function is what makes that possible.
+- Every option in `sdk_options()` turns something off. With a framework, isolation becomes a set of things you must remember to disable, instead of a list of things you chose to include.
+- Neither engine is wrong. The SDK is the better choice when you want an agent that acts on files and tools. A raw API call is the better choice when the job is a controlled conversation you need to audit.
