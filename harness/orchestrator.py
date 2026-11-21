@@ -11,13 +11,14 @@ judgment, so only the prep calls a model.
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
 
-from harness.agents import call_agent
-from harness.schemas import InterviewPrep, Persona
+from harness.agents import AgentError, OutputInvalid, call_agent_json
+from harness.schemas import InterviewPrep, Persona, describe_error
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -55,7 +56,11 @@ def question_bank(segment: str, guide_path: Path) -> str:
 
 
 def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> InterviewPrep:
-    """Prepare one interview and save it to runs/<persona_id>/prep/prep.json."""
+    """Prepare one interview and save it to runs/<persona_id>/prep/prep.json.
+
+    If the reply fails validation twice, save both replies and the error to
+    failed.json so you can see exactly what went wrong, then re-raise.
+    """
     # Built by hand for now. Module 4 moves prompt assembly into build_context(),
     # which enforces what each agent is allowed to see.
     user_message = (
@@ -63,10 +68,16 @@ def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> Interview
         f"Interview guide for this segment:\n\n{question_bank(persona.segment, config['paths']['question_bank'])}"
     )
     out_dir = config["paths"]["runs"] / persona.id / "prep"
-    text = call_agent("prep", user_message, config, log_dir=out_dir, dry_run=dry_run)
-
-    # The code already knows the persona id, so it adds it instead of asking the model.
-    prep = InterviewPrep.model_validate({**json.loads(text), "persona_id": persona.id})
+    try:
+        # The code already knows the persona id, so it adds it instead of asking the model.
+        prep = call_agent_json("prep", user_message, InterviewPrep, config, out_dir, dry_run,
+                               known_fields={"persona_id": persona.id})
+    except OutputInvalid as failure:
+        failed = {"error": describe_error(failure.error), "replies": failure.replies}
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "failed.json").write_text(json.dumps(failed, indent=2))
+        raise
+    (out_dir / "failed.json").unlink(missing_ok=True)  # clear a failure from an earlier run
     (out_dir / "prep.json").write_text(prep.model_dump_json(indent=2))
     return prep
 
@@ -80,10 +91,23 @@ def main() -> None:
     load_dotenv(REPO_ROOT / ".env")
     config = load_config()
     wanted = args.personas.split(",") if args.personas else None
-    for persona in load_personas(config["paths"]["personas"], wanted):
-        prep = run_prep(persona, config, dry_run=args.dry_run)
+    personas = load_personas(config["paths"]["personas"], wanted)
+    failed = []
+    for persona in personas:
+        # One persona failing shouldn't stop the other nine.
+        try:
+            prep = run_prep(persona, config, dry_run=args.dry_run)
+        except AgentError as error:
+            failed.append(persona.id)
+            print(f"{persona.id}: FAILED. {error}")
+            continue
         print(f"{persona.id}: {len(prep.starter_questions)} starter and "
               f"{len(prep.contrasting_questions)} contrasting questions -> runs/{persona.id}/prep/prep.json")
+
+    print(f"\n{len(personas) - len(failed)} of {len(personas)} preps succeeded.")
+    if failed:
+        print(f"Failed: {', '.join(failed)}. See failed.json and calls.jsonl in each prep folder.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

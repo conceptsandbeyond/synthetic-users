@@ -1,8 +1,8 @@
 """call_agent(): the one place in the harness that talks to a model.
 
 Routing every model call through one function gives us one place to log,
-one place to swap in a stub for --dry-run, and (in module 2) one place to
-add retries. If you find a model call anywhere else, it's a bug.
+one place to swap in a stub for --dry-run, and one place to add retries.
+If you find a model call anywhere else, it's a bug.
 """
 
 import json
@@ -13,10 +13,57 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import anthropic
+from pydantic import BaseModel
+
+from harness.schemas import describe_error, parse_reply
 
 
 class AgentError(Exception):
     """A model call returned something we can't use."""
+
+
+class OutputInvalid(AgentError):
+    """The reply failed validation on the first try and on the retry."""
+
+    def __init__(self, agent: str, error: ValueError, replies: list[str]):
+        super().__init__(f"{agent}: reply failed validation twice. Last error:\n{describe_error(error)}")
+        self.error = error
+        self.replies = replies
+
+
+def call_agent_json(
+    agent: str,
+    user_message: str,
+    schema: type[BaseModel],
+    config: dict,
+    log_dir: Path,
+    dry_run: bool = False,
+    known_fields: dict | None = None,
+) -> BaseModel:
+    """Call an agent and return its reply as a validated `schema` object.
+
+    If the reply doesn't validate, ask once more and show the model its own
+    reply and the exact error. Models fix their mistakes far more reliably
+    when told what went wrong than when simply asked again. A second failure
+    raises OutputInvalid: retrying forever hides a broken prompt.
+    """
+    message = user_message
+    replies = []
+    for _ in range(2):  # the first try plus one retry
+        reply = call_agent(agent, message, config, log_dir, dry_run)
+        replies.append(reply)
+        try:
+            return parse_reply(reply, schema, known_fields)
+        except ValueError as error:
+            last_error = error
+            message = (
+                f"{user_message}\n\n---\n"
+                f"Your previous reply could not be used.\n\n"
+                f"Your previous reply:\n{reply}\n\n"
+                f"What was wrong:\n{describe_error(error)}\n\n"
+                f"Reply again with corrected JSON only."
+            )
+    raise OutputInvalid(agent, last_error, replies)
 
 
 def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_run: bool = False) -> str:
@@ -93,11 +140,15 @@ CANNED_REPLIES = {
             "starter_questions": [
                 "Tell me about the last time you had to get something level.",
                 "What made that the day you did it?",
+                "Who else was around while you worked?",
                 "How did you know it was straight?",
+                "When did you find out whether it really was level?",
             ],
             "contrasting_questions": [
                 "Was the bigger problem the time it took or the result?",
                 "Why that method rather than asking someone for help?",
+                "What's worse about your current method than the one before it?",
+                "Would you rather it be faster or more accurate?",
             ],
         }
     ),

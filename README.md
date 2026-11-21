@@ -6,45 +6,49 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 1: a single agent call
+## Module 2: structured outputs
 
-**Goal.** Make one model call, cleanly: send the prep agent a segment and its interview guide, get back an Interview Prep, and log everything about the call.
+**Goal.** Never pass an unchecked model reply downstream. Every reply is parsed into its Pydantic model. A reply that fails gets one retry that shows the model its own reply and what was wrong. A second failure is saved for inspection and the harness moves on.
 
-**Files**
+Module 1's README is on the `module-01-solution` branch.
 
-| File | What it does |
+**Files that change**
+
+| File | What changes |
 | --- | --- |
-| `config.yaml` | Model names and paths. The only place a model name appears. |
-| `personas/*.json` | The 10 synthetic personas. |
-| `prompts/prep.md` | The prep agent's system prompt. |
-| `harness/schemas.py` | `Persona` and `InterviewPrep`, the Pydantic models. |
-| `harness/agents.py` | `call_agent()`, the only function that calls a model, plus the dry-run stub. |
-| `harness/orchestrator.py` | Loads personas, runs the prep agent, saves the result. |
-| `tests/test_schemas.py` | Proves the personas are valid and a dry-run prep works. |
+| `harness/schemas.py` | `InterviewPrep` now enforces the counts the prompt asks for. New `parse_reply()` strips a code fence and validates. New `describe_error()` turns errors into one line per problem. |
+| `harness/agents.py` | New `call_agent_json()`: call, validate, retry once with the error, then raise `OutputInvalid`. `call_agent()` is unchanged and still the only function that calls a model. |
+| `harness/orchestrator.py` | `run_prep()` uses `call_agent_json()` and writes `failed.json` on a double failure. The main loop keeps going when one persona fails and prints a summary. |
+| `tests/test_schemas.py` | Six tests that drive the retry with a fake model, no API key needed. |
 
 **Run it**
 
 ```bash
-pip install -r requirements.txt
 pytest
 python -m harness.orchestrator --dry-run --personas p01
-```
-
-`--dry-run` uses a stub model with a canned answer, so it needs no API key. For a real call, copy `.env.example` to `.env`, add your key, and drop the flag:
-
-```bash
 python -m harness.orchestrator --personas p01
 ```
 
+**Exercise: break the prompt on purpose**
+
+This needs an API key. Run each break against p01, read `calls.jsonl`, then undo it.
+
+1. In `prompts/prep.md`, change "5 to 7 contextual questions" to "2 or 3". The reply is valid JSON but breaks the schema. Watch the retry prompt tell the model `starter_questions` needs at least 5, and see whether it follows the error or the prompt.
+2. Delete the last paragraph of `prompts/prep.md`, the one that describes the JSON. Does the retry rescue it, or do you get a `failed.json`?
+3. Ask for a reply in Markdown instead of JSON. Two failures in a row should leave `failed.json` and a non-zero exit code.
+
 **What good output looks like**
 
-Each persona gets a folder, `runs/<persona_id>/prep/`, holding two files:
-
-- `prep.json`: key hypotheses, who to interview, starter questions and contrasting questions. Good starter questions ask about one recent, real task ("Tell me about the last time..."). Good hypotheses include at least one that would count against the product.
-- `calls.jsonl`: one line per model call with the model, token counts, latency and the exact prompt sent. Open it and check what the prep agent saw: the segment, the job hypothesis and that segment's guide. Not the persona's name, behaviors or objections.
+- A normal run makes one call per persona. `calls.jsonl` has one line.
+- A rescued run has two lines. The second prompt ends with "Your previous reply could not be used", then the bad reply and a short list of what was wrong.
+- A failed persona has `failed.json` with the error and both replies, the other personas still finish, and the summary names the failures.
 
 **Things to notice**
 
-- The model never writes `persona_id`. The code already knows it, so the code adds it.
-- In module 1 the prompt is assembled by hand in `run_prep()`. Module 4 replaces that with `build_context()`, which enforces what each agent may see.
-- A real reply wrapped in a code fence, or with an extra key, will fail validation. That failure is the starting point for module 2.
+- The schema is a contract the prompt makes. Valid JSON can still break it, so the counts in `InterviewPrep` matter as much as the JSON parsing does. Change the prompt and the schema together.
+- A code fence gets fixed in code, not with a retry. Fix whatever is predictable in code and save retries for real mistakes. The raw reply, fence included, is still in `calls.jsonl`.
+- Retry once, not forever. A prompt that fails twice is broken, and more retries just make that cost more.
+
+**In production**
+
+The Claude API can enforce a JSON schema for you through its structured outputs feature, so replies always parse. This harness doesn't use it, because then you'd never see the failures this module is about. Even with it, checks that need context still need code and a retry. Module 6's check that every `evidence_turns` value exists in the transcript is one of those.
