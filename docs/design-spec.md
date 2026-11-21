@@ -252,12 +252,13 @@ harness/
     schemas.py             # Pydantic models for every data contract
     transcript.py          # append-only JSONL writer
     review.py              # command-line human review gate
-    render.py              # fills Interview Prep and User Debrief as Markdown and PDF
+    render.py              # fills Interview Prep and User Debrief as Markdown
   runs/                    # outputs, one folder per persona and run
   tests/
     test_isolation.py
     test_schemas.py
     test_stop_rules.py
+  module9_agent_sdk/       # the same harness rebuilt on the Claude Agent SDK
 ```
 
 ```yaml
@@ -309,7 +310,7 @@ isolation:
 
 ## Teaching plan
 
-Eight modules, each adding one harness piece to working code. Every module ends with something students can run.
+Nine modules. Modules 1 to 8 each add one harness piece to working code, built on the Anthropic Python SDK. Module 9 rebuilds the finished harness on the Claude Agent SDK for comparison. Every module ends with something students can run.
 
 | Module | Harness piece | What students build | Exercise |
 | --- | --- | --- | --- |
@@ -321,6 +322,7 @@ Eight modules, each adding one harness piece to working code. Every module ends 
 | 6 | Pipelines and repeat runs | Debrief agent, 3 runs per persona, parallel personas | Compare 3 debriefs of the same persona and spot what varies |
 | 7 | Evaluation | Devil's advocate, interviewer check, the one web search tool | Find one persona the critic rates low and explain why |
 | 8 | Human in the loop | Review gate and synthesis agent | Approve or reject the 10 debriefs, then critique the synthesis report |
+| 9 | Framework comparison | The same harness rebuilt on the Claude Agent SDK, in `module9_agent_sdk/` | Run both versions on one persona and list what the SDK hid, what it saved and where isolation got harder to prove |
 
 Module 4 is the one I'd spend the most class time on. Showing students how much worse the interviews get when isolation breaks teaches the core idea of harness design better than any slide.
 
@@ -328,9 +330,9 @@ Module 4 is the one I'd spend the most class time on. Showing students how much 
 
 ## Open questions
 
-- [ ] Raw Anthropic SDK or the Claude Agent SDK? The raw SDK shows every moving part, which suits teaching. The Agent SDK is closer to what students would use at work.
+- [x] Raw Anthropic SDK or the Claude Agent SDK? **Decided: both.** Modules 1 to 8 use the raw Anthropic SDK so every moving part is visible. Module 9 rebuilds the harness on the Agent SDK, which is closer to what students would use at work.
 - [ ] Should students write their own agent prompts in module 1, or start from provided ones and improve them?
-- [ ] Output format for rendered templates: Markdown only, or also PDF matching the Concepts and Beyond layout?
+- [x] Output format for rendered templates: Markdown only, or also PDF matching the Concepts and Beyond layout? **Decided: Markdown only.** PDF would add a rendering dependency the course doesn't need. Students can print the Markdown if they want paper.
 - [ ] What's the per-student API budget, and does the class share one key or does each student bring their own?
 - [ ] Should the synthesis agent rank segments, or only describe patterns and leave ranking to students?
 - [ ] Who from the visually impaired and senior communities can review those two personas before class?
