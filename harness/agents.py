@@ -25,27 +25,20 @@ def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_r
     The system prompt is read from prompts/<agent>.md, so prompts can be
     improved without touching code. Each call is built from scratch: no agent
     carries a conversation history between calls.
+
+    TODO (module 1): build this function.
+      1. Look up the model for `agent` in config["models"].
+      2. Read the system prompt from config["paths"]["prompts"] / f"{agent}.md".
+      3. Wrap user_message in a messages list: [{"role": "user", "content": ...}].
+      4. Pick a client: StubClient(agent) if dry_run, otherwise _real_client().
+      5. Call client.messages.create(model=, max_tokens=, system=, messages=)
+         and time it with time.monotonic().
+      6. Join the text of every block whose .type is "text" into one string.
+      7. Log the call with _log_call() before checking for problems.
+      8. Raise AgentError if response.stop_reason is "refusal" or "max_tokens".
+      9. Return the text.
     """
-    model = config["models"][agent]
-    system = (Path(config["paths"]["prompts"]) / f"{agent}.md").read_text()
-    messages = [{"role": "user", "content": user_message}]
-    client = StubClient(agent) if dry_run else _real_client()
-
-    start = time.monotonic()
-    response = client.messages.create(
-        model=model, max_tokens=config["max_tokens"], system=system, messages=messages
-    )
-    latency = time.monotonic() - start
-
-    text = "".join(block.text for block in response.content if block.type == "text")
-    _log_call(log_dir, agent, response, latency, system, messages, text)
-
-    # Log first, then fail: a failed call is exactly the one you'll want to read.
-    if response.stop_reason == "refusal":
-        raise AgentError(f"{agent}: the model declined this request. See {log_dir}/calls.jsonl")
-    if response.stop_reason == "max_tokens":
-        raise AgentError(f"{agent}: reply was cut off at max_tokens. Raise max_tokens in config.yaml")
-    return text
+    raise NotImplementedError("Module 1: build call_agent()")
 
 
 @cache
@@ -59,22 +52,15 @@ def _log_call(log_dir: Path, agent: str, response, latency: float, system: str, 
 
     The exact prompt is logged on purpose. In module 4 this log becomes the
     isolation audit: search it to prove the interviewer never saw the persona.
+
+    TODO (module 1): build this function.
+      1. Create log_dir if it doesn't exist.
+      2. Build a dict with: ts (UTC time), agent, model (response.model),
+         input_tokens and output_tokens (response.usage), latency_s,
+         stop_reason, system, messages and output.
+      3. Append it to log_dir / "calls.jsonl" as one line of JSON.
     """
-    log_dir.mkdir(parents=True, exist_ok=True)
-    record = {
-        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "agent": agent,
-        "model": response.model,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
-        "latency_s": round(latency, 2),
-        "stop_reason": response.stop_reason,
-        "system": system,
-        "messages": messages,
-        "output": output,
-    }
-    with open(log_dir / "calls.jsonl", "a") as f:
-        f.write(json.dumps(record) + "\n")
+    raise NotImplementedError("Module 1: build _log_call()")
 
 
 # --- Dry-run stub -----------------------------------------------------------

@@ -22,6 +22,12 @@ Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [i
 | `harness/orchestrator.py` | Loads personas, runs the prep agent, saves the result. |
 | `tests/test_schemas.py` | Proves the personas are valid and a dry-run prep works. |
 
+**Your task**
+
+You're on the `module-01-start` branch. Everything is in place except two functions in `harness/agents.py`: `call_agent()` and `_log_call()`. Their docstrings list the steps. Build them until `pytest` passes, then compare your version with the `module-01-solution` branch.
+
+Before you start, one test fails on purpose: `test_dry_run_prep_is_valid_and_logged`, because `call_agent()` raises `NotImplementedError`.
+
 **Run it**
 
 ```bash
