@@ -25,6 +25,12 @@ Earlier modules' READMEs are on their `module-NN-solution` branches.
 | `config.yaml` | `interview.max_interviewer_turns`, a safety cap. |
 | `tests/test_interview.py` | New tests for the loop and the transcript. |
 
+**Your task**
+
+You're on the `module-03-start` branch. The transcript writer, schemas, prompts, recent tasks and stub are in place. The loop inside `run_interview()` in `harness/orchestrator.py` is missing: the code that asks the interviewer, records the question, asks the user and records the answer. The TODO comment lists the steps. Build it until `pytest` passes, then compare with the `module-03-solution` branch.
+
+Before you start, the tests that run an interview fail with `NotImplementedError`. That's expected.
+
 **Run it**
 
 ```bash

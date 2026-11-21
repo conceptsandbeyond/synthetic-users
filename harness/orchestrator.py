@@ -97,27 +97,19 @@ def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int 
     # The user never sees the job hypothesis: knowing what's being tested invites it to confirm it.
     profile = persona.model_dump_json(indent=2, exclude={"id", "job_hypothesis", "recent_tasks"})
 
-    # A safety cap so one interviewer that never says "end" can't run up a bill.
-    # Module 5 adds the other stop rules.
-    for _ in range(config["interview"]["max_interviewer_turns"]):
-        # Both prompts are built by hand for now. Module 4 moves this into build_context().
-        move = call_agent_json(
-            "interviewer",
-            f"Interview prep:\n{prep_text}\n\nTranscript so far:\n{transcript.render()}",
-            InterviewerTurn, config, run_dir, dry_run,
-        )
-        if move.action == "end":
-            return transcript, "interviewer ended"
-        transcript.add("interviewer", move.question)
-
-        answer = call_agent(
-            "user",
-            f"Your profile:\n{profile}\n\nThe recent task this interview is about:\n{task}\n\n"
-            f"Transcript so far:\n{transcript.render()}",
-            config, run_dir, dry_run,
-        )
-        transcript.add("user", answer)
-    return transcript, "turn cap"
+    # TODO (module 3): write the relay loop. Repeat at most
+    # config["interview"]["max_interviewer_turns"] times:
+    #   1. Ask the interviewer for its next move with call_agent_json("interviewer", ...,
+    #      InterviewerTurn, config, run_dir, dry_run). Its message holds prep_text and
+    #      transcript.render(), under the headings "Interview prep:" and "Transcript so far:".
+    #   2. If move.action is "end", return transcript, "interviewer ended".
+    #   3. Otherwise add move.question to the transcript as the "interviewer".
+    #   4. Ask the user for an answer with call_agent("user", ..., config, run_dir, dry_run).
+    #      Its message holds profile, task and transcript.render(), under the headings
+    #      "Your profile:", "The recent task this interview is about:" and "Transcript so far:".
+    #   5. Add the answer to the transcript as the "user".
+    # If the loop runs out of turns, return transcript, "turn cap".
+    raise NotImplementedError("Module 3: build the relay loop in run_interview()")
 
 
 def main() -> None:
