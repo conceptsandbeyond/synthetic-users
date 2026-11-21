@@ -6,55 +6,51 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 5: stop rules and budgets
+## Module 6: pipelines and repeat runs
 
-**Goal.** Decide, in code, when an interview has to stop. The interviewer still ends a healthy interview itself. The stop rules catch the unhealthy ones, and every interview reports what it cost.
+**Goal.** Turn one interview into a pipeline. Each persona is prepped once, then interviewed and debriefed three times, each run about a different recent task. Personas run in parallel. Every prep and debrief is also rendered as Markdown laid out like the Concepts and Beyond templates.
 
 Earlier modules' READMEs are on their `module-NN-solution` branches.
-
-**The stop rules.** They're checked before every interviewer turn, and the first one that fires wins.
-
-| Rule | Default | Why |
-| --- | --- | --- |
-| Turn cap | 20 interviewer turns | An interviewer that never says `end` can't run forever. |
-| Token budget | 40,000 tokens per interview | A runaway interview has a fixed worst-case cost. |
-| Stall | 3 answers in a row under 10 words | Short answer after short answer means the interview isn't producing anything. |
-
-A fourth limit, `run_token_cap`, stops the harness from starting new interviews once the whole run has spent too much.
 
 **Files that change**
 
 | File | What changes |
 | --- | --- |
-| `harness/orchestrator.py` | New `stop_rule_hit()`. `run_interview()` loops until a rule fires and returns an `Interview` with the transcript, the stop reason and the token count. It also writes `summary.json`. `main()` enforces `run_token_cap` and prints the total. |
-| `harness/agents.py` | New `TokenMeter`. `call_agent()` and `call_agent_json()` add each call's tokens to it, retries included. |
-| `harness/schemas.py`, `harness/transcript.py` | Each transcript turn records the output tokens it cost. |
-| `config.yaml` | The budget, stall settings and `run_token_cap`. |
-| `tests/test_stop_rules.py` | New. Unit tests for each rule, plus real-loop tests with a terse user and a tiny budget. |
+| `prompts/debrief.md` | New. The debrief agent works from the transcript alone and must cite turns. |
+| `harness/schemas.py` | New `UserDebrief`, plus `check_evidence()`: every cited turn must be an interviewee answer in this transcript. |
+| `harness/agents.py` | `call_agent_json()` takes an optional `check`, an extra test that gets the same single retry as a schema error. |
+| `harness/orchestrator.py` | New `run_debrief()`, `run_persona()` and `RunSpend`. `main()` runs personas in a thread pool. Each step starts in an emptied folder, and `save_failure()` writes `failed-<agent>.json`. |
+| `harness/render.py` | New. Renders `prep.md` and `debrief.md` with the banner, quoting each cited turn. |
+| `config.yaml` | `runs_per_persona`, `parallel_personas`, and the debrief's allow-list (`transcript` only). |
+| `tests/test_pipeline.py` | New tests for the three runs, rendering, debrief isolation, evidence checks and the parallel run. |
 
 **Run it**
 
 ```bash
-pytest tests/test_stop_rules.py -v
-python -m harness.orchestrator --dry-run --personas p01
+pytest
+python -m harness.orchestrator --dry-run
+python -m harness.orchestrator --personas p03
 ```
 
-**Exercise: change the turn cap**
+Outputs land in `runs/<persona_id>/prep/` and `runs/<persona_id>/run-1/` to `run-3/`. Each run folder holds `transcript.jsonl`, `debrief.json`, `debrief.md`, `summary.json` and `calls.jsonl`.
 
-With an API key, run p05 with `max_interviewer_turns` at 5, then at 40.
+**Exercise: compare three debriefs of the same persona**
 
-1. At 5, which prepared questions never got asked? Which hypotheses can't be tested from this transcript?
-2. At 40, did the interviewer end on its own, or did it keep going? If it kept going, read the last ten questions. Are they still useful, or is it repeating itself?
-3. Compare the token counts in each `summary.json`. What does one extra question cost by the end of an interview, when the whole transcript goes into every prompt?
+Run one persona for real, then open its three `debrief.md` files side by side.
+
+1. Which needs show up in all three runs? Those are your strongest signals.
+2. Which needs show up in only one? Is that because the recent task was different, or because the synthetic user said something new?
+3. Pick one insight and read the quoted turn. Does the quote actually support it, or did the debrief agent stretch it?
 
 **What good output looks like**
 
-- Each interview prints its turns, the rule that stopped it and its tokens. Most should say "stopped by interviewer ended".
-- `runs/<persona_id>/run-1/summary.json` holds the same numbers.
-- Each line in `transcript.jsonl` has a `tokens` value.
+- Every need and insight in `debrief.md` has at least one quote under it, from an interviewee answer.
+- The three debriefs overlap but aren't identical. Identical debriefs mean the recent tasks aren't doing their job. Completely different ones mean the persona isn't holding together.
+- The run summary ends with "30 of 30 runs completed" for a full run.
 
 **Things to notice**
 
-- The rules are plain code, not a model's judgment. Stopping has to be predictable, cheap and testable.
-- The budget is checked between turns, so an interview can overshoot by one exchange. A hard stop mid-exchange would leave a question with no answer.
-- Costs grow faster than turns. Each prompt carries the whole transcript, so the 15th question costs far more than the first.
+- The debrief agent never sees the persona. If a debrief says something the transcript doesn't, the evidence check or the reader will catch it.
+- The name comes from code, not from the model. The debrief agent never learns it.
+- Evidence is checked in two layers. Pydantic checks the shape. `check_evidence()` checks the meaning: the cited turn has to exist and has to be an answer.
+- Personas run in parallel, but one persona's runs stay in order, so its logs read top to bottom.

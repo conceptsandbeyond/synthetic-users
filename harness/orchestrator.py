@@ -1,4 +1,4 @@
-"""The orchestrator: prep an interview, then run it, for each persona.
+"""The orchestrator: prep, interview and debrief every persona.
 
 This file grows into the full pipeline over the modules. It is plain Python
 on purpose. The code decides who speaks next, what each agent sees and when
@@ -10,7 +10,10 @@ to stop. Only the steps that need judgment call a model.
 import argparse
 import json
 import re
+import shutil
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +22,9 @@ from dotenv import load_dotenv
 
 from harness.agents import AgentError, OutputInvalid, TokenMeter, call_agent, call_agent_json
 from harness.context import build_context
-from harness.schemas import InterviewerTurn, InterviewPrep, Persona, describe_error
+from harness.render import render_debrief, render_prep
+from harness.schemas import (InterviewerTurn, InterviewPrep, Persona, UserDebrief, check_evidence,
+                             describe_error)
 from harness.transcript import Transcript
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -57,29 +62,36 @@ def question_bank(segment: str, guide_path: Path) -> str:
     raise ValueError(f"No interview guide section for segment {segment!r} in {guide_path}")
 
 
-def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> InterviewPrep:
-    """Prepare one interview and save it to runs/<persona_id>/prep/prep.json.
+def fresh_dir(path: Path) -> Path:
+    """Empty a folder before a step writes to it, so old logs never mix with new ones."""
+    shutil.rmtree(path, ignore_errors=True)
+    path.mkdir(parents=True)
+    return path
 
-    If the reply fails validation twice, save both replies and the error to
-    failed.json so you can see exactly what went wrong, then re-raise.
-    """
+
+def save_failure(out_dir: Path, failure: OutputInvalid) -> None:
+    """Save both bad replies and the error, so you can see exactly what went wrong."""
+    failed = {"error": describe_error(failure.error), "replies": failure.replies}
+    (out_dir / f"failed-{failure.agent}.json").write_text(json.dumps(failed, indent=2))
+
+
+def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> InterviewPrep:
+    """Prepare one interview and save it as prep.json and prep.md."""
+    out_dir = fresh_dir(config["paths"]["runs"] / persona.id / "prep")
     user_message = build_context(
         "prep", config,
         persona_summary=persona,
         question_bank=question_bank(persona.segment, config["paths"]["question_bank"]),
     )
-    out_dir = config["paths"]["runs"] / persona.id / "prep"
     try:
         # The code already knows the persona id, so it adds it instead of asking the model.
         prep = call_agent_json("prep", user_message, InterviewPrep, config, out_dir, dry_run,
                                known_fields={"persona_id": persona.id})
     except OutputInvalid as failure:
-        failed = {"error": describe_error(failure.error), "replies": failure.replies}
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "failed.json").write_text(json.dumps(failed, indent=2))
+        save_failure(out_dir, failure)
         raise
-    (out_dir / "failed.json").unlink(missing_ok=True)  # clear a failure from an earlier run
     (out_dir / "prep.json").write_text(prep.model_dump_json(indent=2))
+    (out_dir / "prep.md").write_text(render_prep(prep))
     return prep
 
 
@@ -87,6 +99,7 @@ def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> Interview
 class Interview:
     """What one interview produced: the transcript, why it stopped, what it cost."""
 
+    run: int
     transcript: Transcript
     stopped_by: str
     tokens: int
@@ -121,7 +134,7 @@ def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int 
     directly: each call is built fresh by build_context() from what that
     agent is allowed to see.
     """
-    run_dir = config["paths"]["runs"] / persona.id / f"run-{run}"
+    run_dir = fresh_dir(config["paths"]["runs"] / persona.id / f"run-{run}")
     transcript = Transcript(run_dir / "transcript.jsonl")
     meter = TokenMeter()
     # Each run talks about a different recent task. That's what makes repeat runs differ.
@@ -147,11 +160,77 @@ def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int 
     summary = {"persona_id": persona.id, "run": run, "stopped_by": stopped_by,
                "turns": len(transcript.turns), "tokens": meter.used}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2))
-    return Interview(transcript, stopped_by, meter.used)
+    return Interview(run, transcript, stopped_by, meter.used)
+
+
+def run_debrief(persona: Persona, interview: Interview, config: dict, dry_run: bool = False) -> UserDebrief:
+    """Debrief one interview from its transcript alone, and save it as debrief.json and debrief.md.
+
+    The debrief agent never sees the persona, so it reports what was said,
+    not what the profile claims. The code adds the name, which it already knows.
+    """
+    run_dir = interview.transcript.path.parent
+    turns = interview.transcript.turns
+    try:
+        debrief = call_agent_json(
+            "debrief", build_context("debrief", config, transcript=interview.transcript),
+            UserDebrief, config, run_dir, dry_run,
+            known_fields={"persona_id": persona.id, "run": interview.run, "name": persona.name},
+            check=lambda d: check_evidence(d, turns),
+        )
+    except OutputInvalid as failure:
+        save_failure(run_dir, failure)
+        raise
+    (run_dir / "debrief.json").write_text(debrief.model_dump_json(indent=2))
+    (run_dir / "debrief.md").write_text(render_debrief(debrief, turns))
+    return debrief
+
+
+class RunSpend:
+    """Tokens spent by the whole run, shared safely between persona threads."""
+
+    def __init__(self, cap: int):
+        self.cap, self.spent, self._lock = cap, 0, threading.Lock()
+
+    def add(self, tokens: int) -> None:
+        with self._lock:
+            self.spent += tokens
+
+    def over_cap(self) -> bool:
+        return self.spent >= self.cap
+
+
+def run_persona(persona: Persona, config: dict, spend: RunSpend, dry_run: bool = False) -> list[tuple[bool, str]]:
+    """Prep once, then interview and debrief the persona runs_per_persona times.
+
+    Returns (succeeded, message) for each run. A failed run is reported and
+    the next run still goes ahead.
+    """
+    try:
+        prep = run_prep(persona, config, dry_run)
+    except AgentError as error:
+        return [(False, f"{persona.id} prep: FAILED. {error}")]
+
+    results = []
+    for run in range(1, config["runs_per_persona"] + 1):
+        label = f"{persona.id} run {run}"
+        if spend.over_cap():
+            results.append((False, f"{label}: SKIPPED. The run has spent {spend.spent:,} tokens."))
+            continue
+        try:
+            interview = run_interview(persona, prep, config, run, dry_run)
+            spend.add(interview.tokens)
+            run_debrief(persona, interview, config, dry_run)
+        except AgentError as error:
+            results.append((False, f"{label}: FAILED. {error}"))
+            continue
+        results.append((True, f"{label}: {len(interview.transcript.turns)} turns, stopped by "
+                              f"{interview.stopped_by}, {interview.tokens:,} tokens, debriefed"))
+    return results
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prep and run one interview for each persona.")
+    parser = argparse.ArgumentParser(description="Prep, interview and debrief each persona.")
     parser.add_argument("--dry-run", action="store_true", help="use the stub model: no API key, no cost")
     parser.add_argument("--personas", help="comma-separated id prefixes, e.g. p01,p05")
     args = parser.parse_args()
@@ -160,28 +239,20 @@ def main() -> None:
     config = load_config()
     wanted = args.personas.split(",") if args.personas else None
     personas = load_personas(config["paths"]["personas"], wanted)
-    failed, total_tokens = [], 0
-    for persona in personas:
-        if total_tokens >= config["run_token_cap"]:
-            print(f"{persona.id}: SKIPPED. The run has spent {total_tokens:,} tokens, over run_token_cap.")
-            failed.append(persona.id)
-            continue
-        # One persona failing shouldn't stop the other nine.
-        try:
-            prep = run_prep(persona, config, dry_run=args.dry_run)
-            interview = run_interview(persona, prep, config, dry_run=args.dry_run)
-        except AgentError as error:
-            failed.append(persona.id)
-            print(f"{persona.id}: FAILED. {error}")
-            continue
-        total_tokens += interview.tokens
-        print(f"{persona.id}: {len(interview.transcript.turns)} turns, stopped by {interview.stopped_by}, "
-              f"{interview.tokens:,} tokens -> {interview.transcript.path.relative_to(REPO_ROOT)}")
+    spend = RunSpend(config["run_token_cap"])
 
-    print(f"\n{len(personas) - len(failed)} of {len(personas)} interviews completed, "
-          f"{total_tokens:,} interview tokens in total.")
-    if failed:
-        print(f"Not completed: {', '.join(failed)}. See failed.json and calls.jsonl in each persona's folders.")
+    # Personas are independent, so they run in parallel. Runs of one persona stay in order.
+    results = []
+    with ThreadPoolExecutor(max_workers=config["parallel_personas"]) as pool:
+        jobs = [pool.submit(run_persona, p, config, spend, args.dry_run) for p in personas]
+        for job in as_completed(jobs):
+            for ok, message in job.result():
+                print(message)
+                results.append(ok)
+
+    print(f"\n{sum(results)} of {len(results)} runs completed, {spend.spent:,} interview tokens in total.")
+    if not all(results):
+        print("Look for failed-<agent>.json and calls.jsonl in the folders named above.")
         sys.exit(1)
 
 

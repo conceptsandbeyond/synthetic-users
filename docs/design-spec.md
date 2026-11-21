@@ -138,6 +138,8 @@ Every agent output is JSON validated against a Pydantic model. An output that fa
 
 ```json
 {
+  "persona_id": "p01-visually-impaired-diyer",
+  "run": 1,
   "name": "Marcus Reed",
   "occupation_role": "Warehouse supervisor, home DIYer",
   "about_me_and_goals": "...",

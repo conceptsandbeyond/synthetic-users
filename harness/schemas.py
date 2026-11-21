@@ -92,6 +92,51 @@ class InterviewerTurn(BaseModel):
         return self
 
 
+class Need(BaseModel):
+    need: str
+    evidence_turns: list[int] = Field(min_length=1)
+
+
+class Insight(BaseModel):
+    insight: str
+    evidence_turns: list[int] = Field(min_length=1)
+
+
+class UserDebrief(BaseModel):
+    """The debrief agent's output. Mirrors the User Debrief template.
+
+    evidence_turns is required on every need and insight. It forces the
+    debrief to cite the transcript, and gives the devil's advocate something
+    concrete to check.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    persona_id: str
+    run: int
+    name: str
+    occupation_role: str
+    about_me_and_goals: str
+    most_pressing_needs: list[Need] = Field(min_length=1)
+    main_insights: list[Insight] = Field(min_length=1)
+    current_solutions: list[str]
+    opportunities: list[str]
+
+
+def check_evidence(debrief: UserDebrief, turns: list[Turn]) -> None:
+    """Raise ValueError unless every cited turn is an answer in this transcript.
+
+    Pydantic can check that evidence_turns holds numbers. Only code that has
+    the transcript can check that the numbers point at something real.
+    """
+    answers = {t.turn for t in turns if t.speaker == "user"}
+    cited = [n for point in debrief.most_pressing_needs + debrief.main_insights for n in point.evidence_turns]
+    wrong = sorted({n for n in cited if n not in answers})
+    if wrong:
+        raise ValueError(f"evidence_turns {wrong} are not interviewee answers. "
+                         f"Cite only these turns: {sorted(answers)}")
+
+
 def parse_reply(text: str, schema: type[BaseModel], known_fields: dict | None = None) -> BaseModel:
     """Turn a model's text reply into a validated schema object, or raise ValueError.
 

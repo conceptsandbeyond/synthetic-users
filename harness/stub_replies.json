@@ -42,5 +42,45 @@
     "It was a set of shelves a couple of weeks ago. I'd put it off for a while, then finally did it on a Saturday morning.",
     "I used the level app on my phone and checked it twice. Honestly I wasn't completely sure until someone else looked at it.",
     "I took the bracket down, moved it a bit and redid one screw. It added maybe half an hour, which was annoying but not the end of the world."
-  ]
+  ],
+  "debrief": {
+    "occupation_role": "Does their own home repairs",
+    "about_me_and_goals": "Handles small jobs around the house and puts them off until a free morning. Wants to finish a job once without redoing it.",
+    "most_pressing_needs": [
+      {
+        "need": "Know the job is level without waiting for someone else to check",
+        "evidence_turns": [
+          4
+        ]
+      },
+      {
+        "need": "Avoid redoing work after it turns out to be off",
+        "evidence_turns": [
+          6
+        ]
+      }
+    ],
+    "main_insights": [
+      {
+        "insight": "The phone app is trusted only up to a point; a second opinion still decides when the job is done",
+        "evidence_turns": [
+          4
+        ]
+      },
+      {
+        "insight": "A redo costs about half an hour, which is annoying but tolerable",
+        "evidence_turns": [
+          6
+        ]
+      }
+    ],
+    "current_solutions": [
+      "Phone level app",
+      "Asking someone to look at it"
+    ],
+    "opportunities": [
+      "Confidence at the moment of fixing, not after",
+      "The current approach may be good enough for small jobs"
+    ]
+  }
 }

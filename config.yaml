@@ -21,15 +21,20 @@ interview:
   stall_answers: 3
   stall_min_words: 10
 
+# Repeat runs and parallelism. Each run uses a different recent task.
+runs_per_persona: 3
+parallel_personas: 4
+
 # Stop starting new interviews once the whole run has spent this many tokens.
 run_token_cap: 1000000
 
 # What each agent may see. build_context() refuses anything else.
-# Later modules add the debrief, advocate and synthesis agents.
+# Later modules add the advocate and synthesis agents.
 isolation:
   prep: [persona_summary, question_bank]
   interviewer: [prep, transcript]
   user: [persona_profile, recent_task, transcript]
+  debrief: [transcript]
 
 # Relative to the repo root.
 paths:

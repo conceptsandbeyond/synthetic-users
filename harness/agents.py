@@ -7,6 +7,7 @@ If you find a model call anywhere else, it's a bug.
 
 import json
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import cache
 from pathlib import Path
@@ -43,6 +44,7 @@ class OutputInvalid(AgentError):
 
     def __init__(self, agent: str, error: ValueError, replies: list[str]):
         super().__init__(f"{agent}: reply failed validation twice. Last error:\n{describe_error(error)}")
+        self.agent = agent
         self.error = error
         self.replies = replies
 
@@ -56,6 +58,7 @@ def call_agent_json(
     dry_run: bool = False,
     known_fields: dict | None = None,
     meter: TokenMeter | None = None,
+    check: Callable[[BaseModel], None] | None = None,
 ) -> BaseModel:
     """Call an agent and return its reply as a validated `schema` object.
 
@@ -63,6 +66,9 @@ def call_agent_json(
     reply and the exact error. Models fix their mistakes far more reliably
     when told what went wrong than when simply asked again. A second failure
     raises OutputInvalid: retrying forever hides a broken prompt.
+
+    `check` is an optional extra test that needs context the schema can't
+    see, such as the transcript. It raises ValueError, and gets the same retry.
     """
     message = user_message
     replies = []
@@ -70,7 +76,10 @@ def call_agent_json(
         reply = call_agent(agent, message, config, log_dir, dry_run, meter)
         replies.append(reply)
         try:
-            return parse_reply(reply, schema, known_fields)
+            result = parse_reply(reply, schema, known_fields)
+            if check:
+                check(result)
+            return result
         except ValueError as error:
             last_error = error
             message = (

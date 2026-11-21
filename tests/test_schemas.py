@@ -132,6 +132,6 @@ def test_failed_prep_is_saved_for_inspection(monkeypatch, tmp_path):
     with pytest.raises(agents.OutputInvalid):
         run_prep(persona, config)
 
-    failed = json.loads((tmp_path / persona.id / "prep" / "failed.json").read_text())
+    failed = json.loads((tmp_path / persona.id / "prep" / "failed-prep.json").read_text())
     assert failed["replies"] == ["not json", "still not json"]
     assert not (tmp_path / persona.id / "prep" / "prep.json").exists()
