@@ -24,16 +24,17 @@ def config(tmp_path):
 
 
 def test_dry_run_interview_alternates_and_ends(config):
-    transcript, stopped_by = run_interview(PERSONA, PREP, config, dry_run=True)
+    interview = run_interview(PERSONA, PREP, config, dry_run=True)
 
-    assert stopped_by == "interviewer ended"
+    assert interview.stopped_by == "interviewer ended"
+    transcript = interview.transcript
     speakers = [t.speaker for t in transcript.turns]
     assert speakers == ["interviewer", "user"] * 3
     assert [t.turn for t in transcript.turns] == [1, 2, 3, 4, 5, 6]
 
 
 def test_transcript_on_disk_matches_memory(config):
-    transcript, _ = run_interview(PERSONA, PREP, config, dry_run=True)
+    transcript = run_interview(PERSONA, PREP, config, dry_run=True).transcript
     assert Transcript.load(transcript.path) == transcript.turns
 
 
@@ -60,12 +61,12 @@ def test_turn_cap_stops_an_interviewer_that_never_ends(config, monkeypatch):
         return InterviewerTurn(action="ask", question="And then what?")
 
     monkeypatch.setattr(orchestrator, "call_agent_json", always_ask)
-    config = config | {"interview": {"max_interviewer_turns": 2}}
+    config = config | {"interview": config["interview"] | {"max_interviewer_turns": 2}}
 
-    transcript, stopped_by = run_interview(PERSONA, PREP, config, dry_run=True)
+    interview = run_interview(PERSONA, PREP, config, dry_run=True)
 
-    assert stopped_by == "turn cap"
-    assert [t.speaker for t in transcript.turns].count("interviewer") == 2
+    assert interview.stopped_by == "turn cap"
+    assert [t.speaker for t in interview.transcript.turns].count("interviewer") == 2
 
 
 def test_ask_without_a_question_is_invalid():

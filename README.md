@@ -6,45 +6,55 @@ Synthetic interviews rehearse an interview guide and surface hypotheses. They ar
 
 Background: [design spec](docs/design-spec.md), [personas](docs/personas.md), [interview guides](docs/jtbd-interview-guides.md).
 
-## Module 4: context isolation
+## Module 5: stop rules and budgets
 
-**Goal.** Make isolation a rule the code enforces instead of a habit. Every prompt is now assembled by `build_context()`, which refuses anything that isn't on that agent's allow-list in `config.yaml`. A test reads the real prompt log and proves the interviewer never saw the persona.
-
-This is the most important module. Spend the time here.
+**Goal.** Decide, in code, when an interview has to stop. The interviewer still ends a healthy interview itself. The stop rules catch the unhealthy ones, and every interview reports what it cost.
 
 Earlier modules' READMEs are on their `module-NN-solution` branches.
+
+**The stop rules.** They're checked before every interviewer turn, and the first one that fires wins.
+
+| Rule | Default | Why |
+| --- | --- | --- |
+| Turn cap | 20 interviewer turns | An interviewer that never says `end` can't run forever. |
+| Token budget | 40,000 tokens per interview | A runaway interview has a fixed worst-case cost. |
+| Stall | 3 answers in a row under 10 words | Short answer after short answer means the interview isn't producing anything. |
+
+A fourth limit, `run_token_cap`, stops the harness from starting new interviews once the whole run has spent too much.
 
 **Files that change**
 
 | File | What changes |
 | --- | --- |
-| `harness/context.py` | New. `build_context()` and the `ARTIFACTS` table that decides how each artifact is shown. |
-| `config.yaml` | New `isolation` allow-list for prep, interviewer and user. |
-| `harness/orchestrator.py` | `run_prep()` and `run_interview()` call `build_context()` instead of formatting prompts themselves. |
-| `tests/test_isolation.py` | New. Audits `calls.jsonl` for all 10 personas, and checks every way `build_context()` can refuse. |
+| `harness/orchestrator.py` | New `stop_rule_hit()`. `run_interview()` loops until a rule fires and returns an `Interview` with the transcript, the stop reason and the token count. It also writes `summary.json`. `main()` enforces `run_token_cap` and prints the total. |
+| `harness/agents.py` | New `TokenMeter`. `call_agent()` and `call_agent_json()` add each call's tokens to it, retries included. |
+| `harness/schemas.py`, `harness/transcript.py` | Each transcript turn records the output tokens it cost. |
+| `config.yaml` | The budget, stall settings and `run_token_cap`. |
+| `tests/test_stop_rules.py` | New. Unit tests for each rule, plus real-loop tests with a terse user and a tiny budget. |
 
 **Run it**
 
 ```bash
-pytest tests/test_isolation.py -v
+pytest tests/test_stop_rules.py -v
 python -m harness.orchestrator --dry-run --personas p01
 ```
 
-**Exercise: leak the persona and watch what happens**
+**Exercise: change the turn cap**
 
-1. In `config.yaml`, add `persona_profile` to the interviewer's list. In `run_interview()`, pass `persona_profile=persona` to the interviewer's `build_context()` call.
-2. Run `pytest`. Ten isolation tests fail, one per persona. The harness caught the leak before a single token was spent.
-3. With an API key, run p01 leaked and then isolated. Put the two sets of questions side by side. Look for questions that assume the answer ("As someone who uses VoiceOver...") or that skip discovery and jump to what the interviewer already "knows".
-4. Undo the leak and make sure `pytest` is green again.
+With an API key, run p05 with `max_interviewer_turns` at 5, then at 40.
+
+1. At 5, which prepared questions never got asked? Which hypotheses can't be tested from this transcript?
+2. At 40, did the interviewer end on its own, or did it keep going? If it kept going, read the last ten questions. Are they still useful, or is it repeating itself?
+3. Compare the token counts in each `summary.json`. What does one extra question cost by the end of an interview, when the whole transcript goes into every prompt?
 
 **What good output looks like**
 
-- Open `runs/p01-visually-impaired-diyer/run-1/calls.jsonl` and search for "Marcus". It appears only in calls where `"agent": "user"`.
-- Every prompt is a set of headed sections in allow-list order: "Interview prep:", then "Transcript:".
+- Each interview prints its turns, the rule that stopped it and its tokens. Most should say "stopped by interviewer ended".
+- `runs/<persona_id>/run-1/summary.json` holds the same numbers.
+- Each line in `transcript.jsonl` has a `tokens` value.
 
 **Things to notice**
 
-- The artifact's name decides what leaves. `persona_summary` renders only the summary, even when you pass it the whole persona, so a careless caller can't leak by accident.
-- A missing artifact is an error too. A prompt that quietly goes out without the transcript is a bug that's hard to spot in the output.
-- The test reads the log, not the code. It checks what the model actually received.
-- One honest limit: the interviewer does learn about the persona through the interviewee's answers. That's the point of an interview. Isolation stops the interviewer from knowing things nobody told it.
+- The rules are plain code, not a model's judgment. Stopping has to be predictable, cheap and testable.
+- The budget is checked between turns, so an interview can overshoot by one exchange. A hard stop mid-exchange would leave a question with no answer.
+- Costs grow faster than turns. Each prompt carries the whole transcript, so the 15th question costs far more than the first.

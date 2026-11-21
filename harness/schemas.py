@@ -73,6 +73,7 @@ class Turn(BaseModel):
     turn: int
     speaker: Literal["interviewer", "user"]
     text: str
+    tokens: int = 0  # output tokens the model spent writing this turn
     ts: str
 
 

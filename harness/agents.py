@@ -22,6 +22,22 @@ class AgentError(Exception):
     """A model call returned something we can't use."""
 
 
+class TokenMeter:
+    """Counts the tokens one interview has spent, so the budget rule can stop it.
+
+    Pass the same meter to every call in an interview. Retries count too:
+    a retry costs real money.
+    """
+
+    def __init__(self):
+        self.used = 0
+        self.last_output_tokens = 0
+
+    def add(self, usage) -> None:
+        self.used += usage.input_tokens + usage.output_tokens
+        self.last_output_tokens = usage.output_tokens
+
+
 class OutputInvalid(AgentError):
     """The reply failed validation on the first try and on the retry."""
 
@@ -39,6 +55,7 @@ def call_agent_json(
     log_dir: Path,
     dry_run: bool = False,
     known_fields: dict | None = None,
+    meter: TokenMeter | None = None,
 ) -> BaseModel:
     """Call an agent and return its reply as a validated `schema` object.
 
@@ -50,7 +67,7 @@ def call_agent_json(
     message = user_message
     replies = []
     for _ in range(2):  # the first try plus one retry
-        reply = call_agent(agent, message, config, log_dir, dry_run)
+        reply = call_agent(agent, message, config, log_dir, dry_run, meter)
         replies.append(reply)
         try:
             return parse_reply(reply, schema, known_fields)
@@ -66,7 +83,8 @@ def call_agent_json(
     raise OutputInvalid(agent, last_error, replies)
 
 
-def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_run: bool = False) -> str:
+def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_run: bool = False,
+               meter: TokenMeter | None = None) -> str:
     """Send one request to the model configured for `agent` and return its text.
 
     The system prompt is read from prompts/<agent>.md, so prompts can be
@@ -86,6 +104,8 @@ def call_agent(agent: str, user_message: str, config: dict, log_dir: Path, dry_r
 
     text = "".join(block.text for block in response.content if block.type == "text")
     _log_call(log_dir, agent, response, latency, system, messages, text)
+    if meter:
+        meter.add(response.usage)
 
     # Log first, then fail: a failed call is exactly the one you'll want to read.
     if response.stop_reason == "refusal":

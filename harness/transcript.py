@@ -23,12 +23,13 @@ class Transcript:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("")
 
-    def add(self, speaker: str, text: str) -> Turn:
+    def add(self, speaker: str, text: str, tokens: int = 0) -> Turn:
         """Record one turn and append it to the file straight away."""
         turn = Turn(
             turn=len(self.turns) + 1,
             speaker=speaker,
             text=text.strip(),
+            tokens=tokens,
             ts=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         )
         self.turns.append(turn)

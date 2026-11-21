@@ -1,5 +1,4 @@
 # Harness configuration. Model names live here and nowhere else.
-# Later modules add budgets.
 
 models:
   prep: claude-sonnet-5-5
@@ -13,9 +12,17 @@ models:
 # mid-JSON is worse than a few unused tokens.
 max_tokens: 16000
 
+# Stop rules. An interview stops at the first one that fires, or when the
+# interviewer returns "end".
 interview:
-  # Safety cap. The interviewer normally ends the interview itself.
   max_interviewer_turns: 20
+  token_budget_per_interview: 40000
+  # Three answers in a row under 10 words means the interview has stalled.
+  stall_answers: 3
+  stall_min_words: 10
+
+# Stop starting new interviews once the whole run has spent this many tokens.
+run_token_cap: 1000000
 
 # What each agent may see. build_context() refuses anything else.
 # Later modules add the debrief, advocate and synthesis agents.

@@ -11,12 +11,13 @@ import argparse
 import json
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
 
-from harness.agents import AgentError, OutputInvalid, call_agent, call_agent_json
+from harness.agents import AgentError, OutputInvalid, TokenMeter, call_agent, call_agent_json
 from harness.context import build_context
 from harness.schemas import InterviewerTurn, InterviewPrep, Persona, describe_error
 from harness.transcript import Transcript
@@ -82,9 +83,39 @@ def run_prep(persona: Persona, config: dict, dry_run: bool = False) -> Interview
     return prep
 
 
+@dataclass
+class Interview:
+    """What one interview produced: the transcript, why it stopped, what it cost."""
+
+    transcript: Transcript
+    stopped_by: str
+    tokens: int
+
+
+def stop_rule_hit(transcript: Transcript, tokens_used: int, config: dict) -> str | None:
+    """Return the name of the stop rule that fires now, or None to keep going.
+
+    Checked before every interviewer turn. These rules protect the budget and
+    catch interviews that have gone wrong. A healthy interview ends earlier,
+    when the interviewer decides it has heard enough.
+    """
+    limits = config["interview"]
+    questions = sum(t.speaker == "interviewer" for t in transcript.turns)
+    if questions >= limits["max_interviewer_turns"]:
+        return "turn cap"
+    if tokens_used >= limits["token_budget_per_interview"]:
+        return "token budget"
+    answers = [t for t in transcript.turns if t.speaker == "user"][-limits["stall_answers"]:]
+    if len(answers) == limits["stall_answers"] and all(
+        len(t.text.split()) < limits["stall_min_words"] for t in answers
+    ):
+        return "stalled"
+    return None
+
+
 def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int = 1,
-                  dry_run: bool = False) -> tuple[Transcript, str]:
-    """Run one interview and return the transcript and the reason it stopped.
+                  dry_run: bool = False) -> Interview:
+    """Run one interview until the interviewer ends it or a stop rule fires.
 
     The code relays every turn. The two agents never talk to each other
     directly: each call is built fresh by build_context() from what that
@@ -92,27 +123,31 @@ def run_interview(persona: Persona, prep: InterviewPrep, config: dict, run: int 
     """
     run_dir = config["paths"]["runs"] / persona.id / f"run-{run}"
     transcript = Transcript(run_dir / "transcript.jsonl")
+    meter = TokenMeter()
     # Each run talks about a different recent task. That's what makes repeat runs differ.
     task = persona.recent_tasks[(run - 1) % len(persona.recent_tasks)]
 
-    # A safety cap so one interviewer that never says "end" can't run up a bill.
-    # Module 5 adds the other stop rules.
-    for _ in range(config["interview"]["max_interviewer_turns"]):
+    while not (stopped_by := stop_rule_hit(transcript, meter.used, config)):
         move = call_agent_json(
             "interviewer", build_context("interviewer", config, prep=prep, transcript=transcript),
-            InterviewerTurn, config, run_dir, dry_run,
+            InterviewerTurn, config, run_dir, dry_run, meter=meter,
         )
         if move.action == "end":
-            return transcript, "interviewer ended"
-        transcript.add("interviewer", move.question)
+            stopped_by = "interviewer ended"
+            break
+        transcript.add("interviewer", move.question, meter.last_output_tokens)
 
         answer = call_agent(
             "user",
             build_context("user", config, persona_profile=persona, recent_task=task, transcript=transcript),
-            config, run_dir, dry_run,
+            config, run_dir, dry_run, meter,
         )
-        transcript.add("user", answer)
-    return transcript, "turn cap"
+        transcript.add("user", answer, meter.last_output_tokens)
+
+    summary = {"persona_id": persona.id, "run": run, "stopped_by": stopped_by,
+               "turns": len(transcript.turns), "tokens": meter.used}
+    (run_dir / "summary.json").write_text(json.dumps(summary, indent=2))
+    return Interview(transcript, stopped_by, meter.used)
 
 
 def main() -> None:
@@ -125,21 +160,28 @@ def main() -> None:
     config = load_config()
     wanted = args.personas.split(",") if args.personas else None
     personas = load_personas(config["paths"]["personas"], wanted)
-    failed = []
+    failed, total_tokens = [], 0
     for persona in personas:
+        if total_tokens >= config["run_token_cap"]:
+            print(f"{persona.id}: SKIPPED. The run has spent {total_tokens:,} tokens, over run_token_cap.")
+            failed.append(persona.id)
+            continue
         # One persona failing shouldn't stop the other nine.
         try:
             prep = run_prep(persona, config, dry_run=args.dry_run)
-            transcript, stopped_by = run_interview(persona, prep, config, dry_run=args.dry_run)
+            interview = run_interview(persona, prep, config, dry_run=args.dry_run)
         except AgentError as error:
             failed.append(persona.id)
             print(f"{persona.id}: FAILED. {error}")
             continue
-        print(f"{persona.id}: {len(transcript.turns)} turns, stopped by {stopped_by} -> {transcript.path.relative_to(REPO_ROOT)}")
+        total_tokens += interview.tokens
+        print(f"{persona.id}: {len(interview.transcript.turns)} turns, stopped by {interview.stopped_by}, "
+              f"{interview.tokens:,} tokens -> {interview.transcript.path.relative_to(REPO_ROOT)}")
 
-    print(f"\n{len(personas) - len(failed)} of {len(personas)} interviews completed.")
+    print(f"\n{len(personas) - len(failed)} of {len(personas)} interviews completed, "
+          f"{total_tokens:,} interview tokens in total.")
     if failed:
-        print(f"Failed: {', '.join(failed)}. See failed.json and calls.jsonl in each persona's folders.")
+        print(f"Not completed: {', '.join(failed)}. See failed.json and calls.jsonl in each persona's folders.")
         sys.exit(1)
 
 

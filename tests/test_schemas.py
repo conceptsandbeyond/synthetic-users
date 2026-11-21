@@ -75,7 +75,7 @@ def fake_model(monkeypatch, *replies):
     """
     queue, prompts = list(replies), []
 
-    def fake_call_agent(agent, user_message, config, log_dir, dry_run=False):
+    def fake_call_agent(agent, user_message, config, log_dir, dry_run=False, meter=None):
         prompts.append(user_message)
         return queue.pop(0)
 
