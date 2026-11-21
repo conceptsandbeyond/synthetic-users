@@ -31,7 +31,27 @@ The harness runs one pipeline per persona: prep the interview, run it between tw
 
 The pipeline runs left to right for each persona, then back along the bottom through review to synthesis.
 
-&#91;embedded content: harness pipeline · 6 agents, 1 relay loop, 1 human gate\]
+```mermaid
+flowchart LR
+    P[Personas<br/>10 profiles] --> PR[Prep agent<br/>Interview Prep]
+    subgraph LOOP[Interview loop - code relays, up to 20 turns]
+        I[Interviewer agent<br/>sees the prep only]
+        U[Synthetic user<br/>sees the persona only]
+        I -- asks --> U
+        U -- answers --> I
+    end
+    PR --> I
+    P -- persona profile --> U
+    LOOP --> T[Transcript<br/>one file per run]
+    T --> D[Debrief agent<br/>User Debrief]
+    D --> A[Devil's advocate<br/>confidence score]
+    A -. low confidence: rerun .-> LOOP
+    A --> H[Human review<br/>approve or reject]
+    H --> S[Synthesis agent<br/>all 10 debriefs]
+    style H stroke-width:3px
+```
+
+Static version: [images/harness-pipeline.png](images/harness-pipeline.png)
 
 The persona goes only to the synthetic user, never to the interviewer, and a low-confidence critique sends the interview back for one rerun.
 
