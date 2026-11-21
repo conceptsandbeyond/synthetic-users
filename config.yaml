@@ -1,0 +1,21 @@
+# Harness configuration. Model names live here and nowhere else.
+# Later modules add interview limits, budgets and the isolation allow-list.
+
+models:
+  prep: claude-sonnet-5-5
+  interviewer: claude-sonnet-5-5
+  user: claude-haiku-5-5
+  debrief: claude-sonnet-5-5
+  advocate: claude-opus-5-5
+  synthesis: claude-opus-5-5
+
+# Upper limit on each model reply. Generous on purpose: a reply cut off
+# mid-JSON is worse than a few unused tokens.
+max_tokens: 16000
+
+# Relative to the repo root.
+paths:
+  personas: personas
+  prompts: prompts
+  runs: runs
+  question_bank: docs/jtbd-interview-guides.md

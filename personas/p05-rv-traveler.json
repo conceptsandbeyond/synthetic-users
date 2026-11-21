@@ -1,0 +1,29 @@
+{
+  "id": "p05-rv-traveler",
+  "segment": "RV, camper and van-lifers",
+  "job_hypothesis": "Level the rig quickly at every stop, even alone",
+  "name": "Gail Whitfield",
+  "age": 67,
+  "location": "Full-time RVer, winters in Quartzsite, Arizona",
+  "behaviors": [
+    "Widowed and travels solo in a fifth-wheel",
+    "Levels the rig at every stop, often after dark",
+    "Walks back and forth between the jacks and a bubble level stuck on the hitch"
+  ],
+  "values": [
+    "Doing it alone, safely",
+    "A working fridge and a good night's sleep"
+  ],
+  "current_alternatives": [
+    "Bubble levels stuck on the hitch and the side of the rig",
+    "Leveling blocks and the jacks, adjusted by trial and error",
+    "A phone app set on the kitchen counter",
+    "Asking a neighbor at the campground to watch the bubble"
+  ],
+  "objections": [
+    "Bluetooth leveling sensors and automatic leveling systems for RVs already exist",
+    "She has bought gadgets before that died or needed fiddly pairing",
+    "A tone at the jacks doesn't tell her which side to raise or by how much",
+    "In daylight her bubble works fine; only night arrivals are a problem"
+  ]
+}

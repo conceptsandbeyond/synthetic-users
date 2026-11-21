@@ -1,0 +1,30 @@
+{
+  "id": "p03-art-hanger",
+  "segment": "Picture and art hangers",
+  "job_hypothesis": "Hang a multi-piece wall so precisely the client never questions it",
+  "name": "Priya Nair",
+  "age": 31,
+  "location": "Brooklyn, New York",
+  "behaviors": [
+    "Freelance installer for galleries and high-end homes",
+    "Hangs 20 to 40 pieces per job",
+    "Uses a laser for layout, then double-checks each piece with a bubble level",
+    "Gets her work through referrals"
+  ],
+  "values": [
+    "Reputation",
+    "A client never spots a crooked frame"
+  ],
+  "current_alternatives": [
+    "A cross-line laser for layout",
+    "A small bubble level on top of each frame as a second check",
+    "Tape measure, painter's tape and pencil marks for spacing",
+    "Stepping back and trusting a trained eye"
+  ],
+  "objections": [
+    "Her laser-plus-bubble routine already works, and changing it risks a mistake on a client's wall",
+    "Getting one frame level is easy; spacing and matching across 30 pieces is the hard part",
+    "A beeping tool in a quiet gallery or a client's living room feels unprofessional",
+    "She'd need to see it match her bubble level's precision before trusting it"
+  ]
+}

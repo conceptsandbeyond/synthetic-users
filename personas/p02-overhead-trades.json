@@ -1,0 +1,29 @@
+{
+  "id": "p02-overhead-trades",
+  "segment": "Overhead and awkward-angle trades",
+  "job_hypothesis": "Get overhead runs straight on the first pass without climbing down to check",
+  "name": "Luis Ortega",
+  "age": 36,
+  "location": "Houston, Texas",
+  "behaviors": [
+    "Commercial electrician mounting conduit and fixtures on ladders all day",
+    "Climbs down 4 or 5 times per run to check the bubble",
+    "Buys his own hand tools; the company buys the big ones"
+  ],
+  "values": [
+    "Speed",
+    "Fewer ladder trips"
+  ],
+  "current_alternatives": [
+    "A torpedo level read from the ladder at an awkward angle",
+    "Climbing down to sight the bubble from below",
+    "A helper on the ground calling out readings",
+    "A self-leveling cross-line laser, on jobs where the company has one"
+  ],
+  "objections": [
+    "Sites are loud; he may not hear a tone over saws and compressors",
+    "On jobs with a laser, the problem is already solved",
+    "Anything he carries up a ladder has to survive drops and a tool bag",
+    "He won't spend much of his own money on something he thinks the company should buy"
+  ]
+}

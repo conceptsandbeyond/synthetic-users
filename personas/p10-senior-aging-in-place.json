@@ -1,0 +1,30 @@
+{
+  "id": "p10-senior-aging-in-place",
+  "segment": "Seniors aging in place",
+  "job_hypothesis": "Keep doing her own fixes so she doesn't feel dependent",
+  "name": "Dorothy Kaplan",
+  "age": 74,
+  "location": "Boca Raton, Florida",
+  "behaviors": [
+    "Former teacher with macular degeneration",
+    "Still hangs her own pictures and grab-bar hooks",
+    "Squints at the bubble, then asks her son to check when he visits",
+    "Her son buys most of her gadgets"
+  ],
+  "values": [
+    "Staying capable",
+    "Not becoming \"a project\" for her kids"
+  ],
+  "current_alternatives": [
+    "A standard bubble level, held close",
+    "A magnifier",
+    "Asking her son to check when he visits",
+    "A handyman for the bigger jobs"
+  ],
+  "objections": [
+    "She doesn't want a gadget that announces she can't see well",
+    "New devices often mean tiny buttons and an app someone has to set up for her",
+    "Her son would be the one buying it, and he might just do the job himself",
+    "For a picture hook, patience and a careful look are usually good enough"
+  ]
+}

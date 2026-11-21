@@ -1,0 +1,12 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Harness outputs (keep the folder, not the files)
+runs/*
+!runs/.gitkeep

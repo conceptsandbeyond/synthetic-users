@@ -1,0 +1,30 @@
+{
+  "id": "p08-photographer",
+  "segment": "Photographers and videographers",
+  "job_hypothesis": "Get a straight horizon without taking attention off the shot",
+  "name": "Mei Chen",
+  "age": 34,
+  "location": "Seattle, Washington",
+  "behaviors": [
+    "Real estate and landscape photographer",
+    "Relies on the camera's built-in electronic level",
+    "Fixes horizons in Lightroom",
+    "Carries a hot-shoe bubble level she rarely uses"
+  ],
+  "values": [
+    "Speed on shoots",
+    "A light bag"
+  ],
+  "current_alternatives": [
+    "The camera's built-in electronic level",
+    "Straightening horizons in Lightroom",
+    "A hot-shoe bubble level",
+    "The bubble on her tripod head"
+  ],
+  "objections": [
+    "Her camera already has a level built in",
+    "Fixing a horizon in post takes a few seconds",
+    "A tone would be distracting on a shoot and would ruin video audio",
+    "She doesn't want another accessory in her bag"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "p01-visually-impaired-diyer",
+  "segment": "Visually impaired DIYers",
+  "job_hypothesis": "Finish a home task without depending on anyone",
+  "name": "Marcus Reed",
+  "age": 44,
+  "location": "Columbus, Ohio",
+  "behaviors": [
+    "Lost most of his sight to glaucoma at 38",
+    "Hangs shelves and fixes things around the house using a beeping phone level app and touch",
+    "Asks his neighbor to check his work afterward and dislikes doing it",
+    "Active on the AppleVis forums"
+  ],
+  "values": [
+    "Independence",
+    "Not owing anyone a favor"
+  ],
+  "current_alternatives": [
+    "A beeping phone level app used with VoiceOver",
+    "Asking his neighbor to check the work afterward",
+    "Tactile checks: running a hand along an edge, measuring down from the ceiling with a tape",
+    "Putting the job off until someone can help"
+  ],
+  "objections": [
+    "The free phone app is good enough most of the time",
+    "He'd need proof it's accurate before he stops asking for a second check",
+    "Plenty of products marketed as accessible were clearly never tested with blind users, so he's skeptical of the claim",
+    "A tone is hard to hear over a drill or with the TV on"
+  ]
+}

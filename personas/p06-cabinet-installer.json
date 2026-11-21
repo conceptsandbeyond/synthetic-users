@@ -1,0 +1,29 @@
+{
+  "id": "p06-cabinet-installer",
+  "segment": "Cabinet and countertop installers",
+  "job_hypothesis": "Install a full kitchen fast with zero callbacks",
+  "name": "Derek Simmons",
+  "age": 45,
+  "location": "Charlotte, North Carolina",
+  "behaviors": [
+    "Owns a 4-person crew doing 3 or 4 kitchens a week",
+    "Personally checks every cabinet run because he doesn't trust his apprentices with level yet",
+    "A callback costs him half a day"
+  ],
+  "values": [
+    "Zero callbacks",
+    "A crew that works without him"
+  ],
+  "current_alternatives": [
+    "4-foot and 2-foot box levels",
+    "A self-leveling laser to set a reference line across the run",
+    "Shimming each cabinet to the laser line",
+    "Doing the final level check himself"
+  ],
+  "objections": [
+    "The laser already gives the crew a reference line",
+    "The hard skill isn't reading a level; it's knowing how to shim an uneven floor",
+    "Gear on his sites gets dropped, lost and covered in dust",
+    "He'd need to watch an apprentice get a full run right alone before he'd stop checking"
+  ]
+}

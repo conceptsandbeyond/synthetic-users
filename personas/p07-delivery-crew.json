@@ -1,0 +1,29 @@
+{
+  "id": "p07-delivery-crew",
+  "segment": "Furniture and appliance delivery crews",
+  "job_hypothesis": "Finish each setup fast and leave with no complaint",
+  "name": "Andre Baptiste",
+  "age": 27,
+  "location": "Newark, New Jersey",
+  "behaviors": [
+    "Delivers and installs washers and fridges for a big-box retailer",
+    "Makes 10 to 12 stops a day",
+    "Skips the level check in tight laundry closets when running late"
+  ],
+  "values": [
+    "Finishing the route on time",
+    "No customer complaints"
+  ],
+  "current_alternatives": [
+    "A small torpedo level kept in the truck",
+    "Rocking the machine by hand to feel for a wobble",
+    "Skipping the check when behind schedule",
+    "Going back on a service call when a customer reports a wobble"
+  ],
+  "objections": [
+    "He doesn't buy tools; the company does",
+    "Any extra step costs time on a tight route",
+    "Rocking the machine tells him enough most of the time",
+    "Tools on the truck get lost or broken within weeks"
+  ]
+}

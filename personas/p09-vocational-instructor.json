@@ -1,0 +1,29 @@
+{
+  "id": "p09-vocational-instructor",
+  "segment": "Schools and vocational programs",
+  "job_hypothesis": "Equip every student, including those with disabilities, without separate tools",
+  "name": "Robert Haynes",
+  "age": 52,
+  "location": "Pittsburgh, Pennsylvania",
+  "behaviors": [
+    "Teaches construction trades at a community college",
+    "Had two low-vision students last year and improvised with tactile tools",
+    "Needs approval for any purchase over $50",
+    "His budget is spent each spring"
+  ],
+  "values": [
+    "Inclusion without separate accommodations"
+  ],
+  "current_alternatives": [
+    "Standard bubble levels for the whole class",
+    "Improvised tactile tools for low-vision students",
+    "Pairing a low-vision student with a sighted partner",
+    "Requesting equipment through the college's disability services office"
+  ],
+  "objections": [
+    "Anything over $50 needs approval, and the budget is gone by spring",
+    "He'd want evidence from low-vision users before trusting an accessibility claim",
+    "Twenty levels beeping at once in one shop would be chaos",
+    "Students need to learn the standard bubble level they'll use on real jobs"
+  ]
+}

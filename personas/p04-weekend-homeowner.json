@@ -1,0 +1,29 @@
+{
+  "id": "p04-weekend-homeowner",
+  "segment": "Weekend homeowners",
+  "job_hypothesis": "Get it right the first time without feeling incompetent",
+  "name": "Emily Clarke",
+  "age": 36,
+  "location": "Naperville, Illinois",
+  "behaviors": [
+    "Does furniture assembly and TV mounts on Saturday afternoons with her husband Jason, 38",
+    "Uses a phone level app because the real level is lost somewhere in the garage",
+    "She and Jason left three extra holes behind the TV last time"
+  ],
+  "values": [
+    "Getting it right the first time",
+    "Saving the weekend"
+  ],
+  "current_alternatives": [
+    "A phone level app",
+    "The bubble level, on the days they can find it",
+    "Eyeballing it and asking Jason whether it looks straight",
+    "Hiring a handyman for the bigger jobs"
+  ],
+  "objections": [
+    "The phone app is free and always in her pocket",
+    "They mount something a few times a year, so a dedicated tool would sit in a drawer",
+    "The extra holes came from measuring wrong, not from the level",
+    "She doesn't want another gadget to figure out on a Saturday"
+  ]
+}
